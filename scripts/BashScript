@@ -1,21 +1,26 @@
 #!/bin/bash
+source /opt/ros/melodic/setup.bash
+source /home/user/catkin_ws/devel/setup.bash
+sudo chmod 666 /dev/ttyACM0
 arrVar=()
 roscore &
 arrVar+=("$!")
-roslaunch ydlidar_ros_driver X4.launch &
+sleep 15s
+#roslaunch ydlidar_ros_driver X4.launch &
+#arrVar+=("$!")
+rosrun FireFighterRos autonomous_control.py &
 arrVar+=("$!")
 rostopic pub /autonomous_control_on std_msgs/Bool "data: true" &
 arrVar+=("$!")
-rosrun FireFighterRos autonomous_control.py &
-arrVar+=("$!")
-chmod 666 /dev/ttyACM0
-rosrun FireFighterRos mecanum_drive.py &
-arrVar+=("$!")
+#rosrun FireFighterRos mecanum_drive.py &
+#arrVar+=("$!")	
 rosrun rosserial_python serial_node.py /dev/ttyACM0 _baud:=1000000 &
 arrVar+=("$!")
 rosrun FireFighterRos pan_tilt_control.py &
+sleep 5s
 arrVar+=("$!")
 rosrun FireFighterRos vision_jetson.py &
+arrVar+=("$!")
 
 echo ${arrVar[@]}
 

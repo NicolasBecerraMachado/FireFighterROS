@@ -48,7 +48,7 @@ class PanTiltNode():
         self.water_spray_enabled = False
         self.spray_base_pan = self.pan_angle
         self.spray_base_tilt = self.tilt_angle
-        self.spray_step = 1
+        self.spray_step = 0.7
         self.spray_step_counter = 0
         self.spray_direction = 1
         self.spray_cycle_counter = 0
@@ -157,8 +157,8 @@ class PanTiltNode():
             self.pump_msg.data = 100
         
 	current_pan = current_pan if current_pan < 165 else 165
-        self.pan_msg.data = abs(int(current_pan)) if current_pan > 15 else 15
-        #self.tilt_msg.data = abs(int(current_tilt)) if current_tilt > 20 else 20
+        #self.pan_msg.data = abs(int(current_pan)) if current_pan > 15 else 15
+        self.tilt_msg.data = abs(int(current_tilt)) if current_tilt > 20 else 20
         #print("Spray tilt: " + str(self.tilt_msg.data))
         #print("Spray pan: " + str(self.pan_msg.data))        
 	self.pub_pan.publish(self.pan_msg)

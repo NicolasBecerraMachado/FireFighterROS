@@ -53,7 +53,7 @@ def targetFiltering(contours, redMask):
         cntY = int(Mmts["m01"]/Mmts["m00"]) #Calculates centroid in Y
 
         redCenter = redMask[cntY,cntX] == 255
-        areaInRange = (area > 350 and area < 60000) #Area threshold, adjust to avoid false positives 
+        areaInRange = (area > 2750 and area < 80000) #Area threshold, adjust to avoid false positives 
         centerInRange = ((cntX > 0) and (cntX < src_width) and (cntY > 0) and (cntY < src_height))
 
         if  areaInRange and redCenter and centerInRange: 
@@ -62,8 +62,8 @@ def targetFiltering(contours, redMask):
             widthToHeight = w/h
             squareness = area / w*h
 
-            aspectRatioInRange = (widthToHeight > 0.65 and widthToHeight < 1.4)
-            squarenessInRange = squareness > 0.7
+            aspectRatioInRange = (widthToHeight > 0.6 and widthToHeight < 1.5)
+            squarenessInRange = squareness > 0.8
             
             if aspectRatioInRange and squarenessInRange:
 
@@ -98,11 +98,11 @@ def image_processing(image):
     imageHSV = cv2.cvtColor(image,cv2.COLOR_BGR2HSV)
     
     ################## RED CANDLE DETECTOR ####################
-    lower_1 = np.array([0,55,55])
-    upper_1 = np.array([6,255,255])
+    lower_1 = np.array([0,0,55])
+    upper_1 = np.array([30,255,255])
     redMask_1 = cv2.inRange(imageHSV, lower_1, upper_1)
     
-    lower_2 = np.array([170,55,55])
+    lower_2 = np.array([170,0,55])
     upper_2 = np.array([179,255,255])
     redMask_2 = cv2.inRange(imageHSV, lower_2, upper_2)
     

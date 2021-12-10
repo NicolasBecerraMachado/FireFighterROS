@@ -32,16 +32,16 @@ class AutonomousControl():
         self.fire_homing_enabled = False
         self.fire_in_water_range = False
         self.fire_angle = np.inf
-        self.k_FH0 = 0.6
+        self.k_FH0 = 0.65
 
         #After Spray Turn
         self.turn_robot_enabled = False
         self.turn_robot_counter = 0
 
         ##Obstacle avoidance
-        self.avoid_obstacle_range = 0.9
+        self.avoid_obstacle_range = 0.8
         self.robot_radius = 0.3
-        self.k_A0 = 0.6
+        self.k_A0 = 0.4
         self.closest_angle = 0.0 #Angle to the closest object
         self.closest_range = np.inf #Distance to the closest object
 
@@ -74,7 +74,7 @@ class AutonomousControl():
         self.vel_msg.linear.x = 0.0 #m/s
         
         if(self.turn_robot_counter < 30):
-            self.vel_msg.angular.z = 0.5 #turns 90 degrees (PI/2) in 0.8 seconds (20 cycles at 10Hz)
+            self.vel_msg.angular.z = 0.7 #turns 90 degrees (PI/2) in 0.8 seconds (20 cycles at 10Hz)
             self.turn_robot_counter += 1
 
         else:
@@ -104,7 +104,7 @@ class AutonomousControl():
                 vel_msg.angular.z = 0.0 #rad/s
                 return vel_msg
              
-        vel_msg.linear.x = 0.2 #m/s
+        vel_msg.linear.x = 0.17 #m/s
         vel_msg.angular.z = 0.0 #rad/s
         return vel_msg
 
