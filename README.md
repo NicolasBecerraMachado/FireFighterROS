@@ -4,7 +4,7 @@ Firefighter robot
 ## functionality
 #### needs to have
 
-face detection
+remote control
 
 find paths
 
@@ -16,6 +16,8 @@ throw water
 
 #### nice 2 have
 
+face detection
+
 upload data to cloud
 
 interface to call emergency services
@@ -23,6 +25,8 @@ interface to call emergency services
 connect with other IoT devices
 
 ## materials
+
+Raspberry pi 3
 
 ~ LIDAR
 
@@ -42,20 +46,27 @@ pump for water
 
 servomotor for water
 
+servo driver
+
 camera
 
 frames
 
 laptop
 
+battery
+
+antenna
+
+hotspot host device
+
 ## software dependencies
 
-ROS
-
-Ubuntu{
+ROS{
   iot_bridge
 }
 
+Ubuntu
 
 ## useful links
 
