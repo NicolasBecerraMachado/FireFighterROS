@@ -2,14 +2,14 @@
 Firefighter robot
 
 ## functionality
-### needs to have
+#### needs to have
 face detection
 find paths
 sense environment with LIDAR
 detect fire
 throw water
 
-### nice 2 have
+#### nice 2 have
 upload data to cloud
 interface to call emergency services
 connect with other IoT devices
