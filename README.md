@@ -3,7 +3,7 @@ Firefighter robot
 
 ## functionality
 #### needs to have
-face detection
+face detection\n
 find paths
 sense environment with LIDAR
 detect fire
