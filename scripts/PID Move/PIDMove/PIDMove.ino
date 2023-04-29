@@ -11,7 +11,7 @@
  #include <TimeLib.h>
  #include <Encoder.h>
  #include <PID_v1.h>
- #include <std_msgs/Int32.h>
+ #include <std_msgs/Float64.h>
  #include <std_msgs/String.h> 
  #include <avr/io.h>
  #include <avr/interrupt.h>
@@ -55,11 +55,14 @@
  * Global variables
  */
 ros::NodeHandle nh;
-volatile int pwm1; //The motor pwm value between -255->full speed backwards and 255-> Full speed forward
-volatile int pwm2; //The motor pwm value between -255->full speed backwards and 255-> Full speed forward
-volatile int pwm3;
-volatile int pwm4;
+volatile double pwm[4] = {0,0,0,0}; //The motor pwm value between -255->full speed backwards and 255-> Full speed forward
+int enables[4] = {MOT1_EN, MOT2_EN, MOT3_EN, MOT4_EN};
+int in1[4] = {MOT1_IN1, MOT2_IN1, MOT3_IN1, MOT4_IN1};
+int in2[4] = {MOT1_IN2, MOT2_IN2, MOT3_IN2, MOT4_IN2};
 
+
+volatile double w[4] = {0,0,0,0};
+volatile double w_abs[4] = {0,0,0,0};
 volatile int OldCount[4] = { -999,-999,-999,-999 };
 volatile int Count[4];
 volatile int interrupts;
@@ -73,7 +76,12 @@ boolean interrupt0;
 unsigned int reload = 0xF424; 
 double Speeds[4];
 
-//PID M1(&Speeds[0],&pwm1,&w0, 1,0,0,DIRECT);
+PID M1(&Speeds[0],&pwm[0],&w_abs[0], 10,30,1,DIRECT);
+PID M2(&Speeds[1],&pwm[1],&w_abs[1], 10,30,1,DIRECT);
+PID M3(&Speeds[2],&pwm[2],&w_abs[2], 10,30,1,DIRECT);
+PID M4(&Speeds[3],&pwm[3],&w_abs[3], 10,30,1,DIRECT);
+
+//PID Controllers[4] = {M1, M2, M3, M4};
 
 Encoder Motor[4] = {{20,26}, {21,28}, {18,22}, {19,24}};
 
@@ -114,97 +122,76 @@ void motor_backwards(unsigned int vel, int EN, int In1, int In2) {
 
 
 //Motor callback
-void pwm1_cb(const std_msgs::Int32 & msg) {
-        digitalWrite(LED, HIGH - digitalRead(LED)); //toggles a led to indicate this topic is active
-        pwm1 = msg.data;
-        if (pwm1 >= 0 && pwm1 <= 255) {
-                motor_forward((unsigned int) pwm1, MOT1_EN, MOT1_IN1, MOT1_IN2);
-        } else if (pwm1 < 0 && pwm1 >= -255) {
-                motor_backwards((unsigned int) -1*pwm1, MOT1_EN, MOT1_IN1, MOT1_IN2);
-        } else {
-                //Stop if received a wrong value or 0
-                nh.logerror("Invalid data received; make sure to send a value between -255 and 255");
-                nh.logerror("The motor will stop");
-                motor_stop(MOT1_EN, MOT1_IN1, MOT1_IN2);
-        }
+void pwm_cb(int motorID) {
+    if (w[motorID] >= 0) {
+      motor_forward((unsigned int) pwm[motorID], enables[motorID], in1[motorID], in2[motorID]);
+    } else if (w[motorID] < 0) {
+      motor_backwards((unsigned int) pwm[motorID], enables[motorID], in1[motorID], in2[motorID]);
+    }
 }
 
-void pwm2_cb(const std_msgs::Int32 & msg) {
-        digitalWrite(LED, HIGH - digitalRead(LED)); //toggles a led to indicate this topic is active
-        pwm2 = msg.data;
-        if (pwm2 >= 0 && pwm2 <= 255) {
-                motor_forward((unsigned int) pwm2, MOT2_EN, MOT2_IN1, MOT2_IN2);
-        } else if (pwm2 < 0 && pwm2 >= -255) {
-                motor_backwards((unsigned int) -1*pwm2, MOT2_EN, MOT2_IN1, MOT2_IN2);
-        } else {
-                //Stop if received a wrong value or 0
-                nh.logerror("Invalid data received; make sure to send a value between -255 and 255");
-                nh.logerror("The motor will stop");
-                motor_stop(MOT2_EN, MOT2_IN1, MOT2_IN2);
-        }
+void set_w(int motorID, volatile double value){
+  w[motorID] = value;
+  w_abs[motorID] = abs(w[motorID]);
+  if(w_abs[motorID] > 15){
+    w_abs[motorID] = 15;
+  }
 }
 
-void pwm3_cb(const std_msgs::Int32 & msg) {
-        digitalWrite(LED, HIGH - digitalRead(LED)); //toggles a led to indicate this topic is active
-        pwm3 = msg.data;
-        if (pwm3 >= 0 && pwm3 <= 255) {
-                motor_forward((unsigned int) pwm3, MOT3_EN, MOT3_IN1, MOT3_IN2);
-        } else if (pwm3 < 0 && pwm3 >= -255) {
-                motor_backwards((unsigned int) -1*pwm3, MOT3_EN, MOT3_IN1, MOT3_IN2);
-        } else {
-                //Stop if received a wrong value or 0
-                nh.logerror("Invalid data received; make sure to send a value between -255 and 255");
-                nh.logerror("The motor will stop");
-                motor_stop(MOT3_EN, MOT3_IN1, MOT3_IN2);
-        }
+void w0_cb(const std_msgs::Float64 &msg) {
+    set_w(0,msg.data);
 }
 
-void pwm4_cb(const std_msgs::Int32 & msg) {
-        digitalWrite(LED, HIGH - digitalRead(LED)); //toggles a led to indicate this topic is active
-        pwm4 = msg.data;
-        if (pwm4 >= 0 && pwm4 <= 255) {
-                motor_forward((unsigned int) pwm4, MOT4_EN, MOT4_IN1, MOT4_IN2);
-        } else if (pwm4 < 0 && pwm4 >= -255) {
-                motor_backwards((unsigned int) -1*pwm4, MOT4_EN, MOT4_IN1, MOT4_IN2);
-        } else {
-                //Stop if received a wrong value or 0
-                nh.logerror("Invalid data received; make sure to send a value between -255 and 255");
-                nh.logerror("The motor will stop");
-                motor_stop(MOT4_EN, MOT4_IN1, MOT4_IN2);
-        }
+void w1_cb(const std_msgs::Float64 &msg) {
+    set_w(1,msg.data);
+}
+
+void w2_cb(const std_msgs::Float64 &msg) {
+    set_w(2,msg.data);
+}
+
+void w3_cb(const std_msgs::Float64 &msg) {
+    set_w(3,msg.data);
 }
 
 
 //Creates the ROS subscribers
-ros::Subscriber<std_msgs::Int32> pwm1_sub("arduino/pwm1", pwm1_cb);
+ros::Subscriber<std_msgs::Float64> w0_sub("arduino/w0", w0_cb);
+ros::Subscriber<std_msgs::Float64> w1_sub("arduino/w1", w1_cb);
+ros::Subscriber<std_msgs::Float64> w2_sub("arduino/w2", w2_cb);
+ros::Subscriber<std_msgs::Float64> w3_sub("arduino/w3", w3_cb);
 
-//Creates the ROS subscribers
-ros::Subscriber<std_msgs::Int32> pwm2_sub("arduino/pwm2", pwm2_cb);
-
-ros::Subscriber<std_msgs::Int32> pwm3_sub("arduino/pwm3", pwm3_cb);
-
-//Creates the ROS subscribers
-ros::Subscriber<std_msgs::Int32> pwm4_sub("arduino/pwm4", pwm4_cb);
-
-std_msgs::String str_msg;
+std_msgs::Float64 str_msg;
 ros::Publisher chatter("chatter", &str_msg); 
 
 ros::Publisher info("info", &str_msg); 
+
+std_msgs::String strmsg;
+ros::Publisher speeds("RPM", &strmsg);
 char texto[128];
 int motorval[2];
 /*
  * Arduino SETUP
  */
 void setup() {
+  
         //init ROS communication
         nh.initNode();
         nh.advertise(chatter);
         nh.advertise(info);
+        nh.advertise(speeds);
+        
         //Subscribed ROS topics
-        nh.subscribe(pwm1_sub);
-        nh.subscribe(pwm2_sub);
-        nh.subscribe(pwm3_sub);
-        nh.subscribe(pwm4_sub);
+        nh.subscribe(w0_sub);
+        nh.subscribe(w1_sub);
+        nh.subscribe(w2_sub);
+        nh.subscribe(w3_sub);
+        
+        M1.SetMode(AUTOMATIC);
+        M2.SetMode(AUTOMATIC);
+        M3.SetMode(AUTOMATIC);
+        M4.SetMode(AUTOMATIC);
+        
         // Arduino pins definition
         pinMode(LED, OUTPUT);
         pinMode(MOT1_IN1, OUTPUT);
@@ -252,20 +239,21 @@ void setup() {
 
 double CalcVel(Encoder enc, int motorID){
   float delta;
-  double w;
+  double vel;
   double RPM;
   Count[motorID] = enc.read();
   if(Count[motorID] != OldCount[motorID]){
     delta = Count[motorID] - OldCount[motorID];
     OldCount[motorID] = Count[motorID];
-    w = (2.0*PI*delta)/CPR;
-    RPM = 10*((w)/(2.0*PI))*60;
+    vel = 10*(2.0*PI*delta)/CPR;
+    RPM = ((vel)/(2.0*PI))*60;
   }
-    /*sprintf(texto, "MotorID = %d  OldCount = %d Delta = %d W = %d RPM = %d", motorID,OldCount[motorID],(int)delta, (int)w, (int)RPM);
-    str_msg.data = texto; 
-    info.publish( &str_msg );
-    */
-  return RPM;
+  if (w[motorID]>=0){
+    return vel;
+  } else {
+    return -vel;
+  }
+  
 }
 
 
@@ -275,9 +263,16 @@ ISR(TIMER5_OVF_vect) {
   for(int i = 0; i < 4; i++){
       Speeds[i] = CalcVel(Motor[i], i);
   }
-  sprintf(texto, "M0 = %d M1 = %d M2 = %d M3 = %d", (int)Speeds[0], (int)Speeds[1],(int)Speeds[2],(int)Speeds[3]);
-  str_msg.data = texto;
-  chatter.publish( &str_msg );
+  
+  M1.Compute();
+  M2.Compute();
+  M3.Compute();
+  M4.Compute();
+
+  for(int i = 0; i < 4; i++){
+      pwm_cb(i);
+  }
+  
   TCNT5H = Time5Count/256;
   TCNT5L = Time5Count%256;
   interrupts++;   
@@ -286,16 +281,21 @@ ISR(TIMER5_OVF_vect) {
 /*
  * Arduino MAIN LOOP
  */
+
+char text[120];
 void loop() {
         nh.spinOnce();
-        
+        std_msgs::Float64 aux;
+        aux.data = Speeds[1];
         //motorval[0] = analogRead(A1);
         //motorval[1] = analogRead(A0);
         
-        
-    
-        
-        
-        //delay(1);
+        chatter.publish(&aux);
+        aux.data = pwm[1];
+        info.publish(&aux);
+        sprintf(text, "M0 = %d M1 = %d M2 = %d M3 = %d", (int)(Speeds[0]*10.0), (int)(Speeds[1]*10.0),(int)(Speeds[2]*10.0),(int)(Speeds[3]*10.0));
+        strmsg.data = text;
+        speeds.publish(&strmsg);
+        delay(200);
         
   }

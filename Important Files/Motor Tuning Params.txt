@@ -1,0 +1,20 @@
+MOTOR 1
+	P = 15
+	I = 30
+	(v2)
+	P = 10
+	I = 30
+	D = 1
+MOTOR 2
+	P = 10
+	I = 30
+	D = 1
+Motor 3
+	P = 10
+	I = 30
+	D = 1
+Motor 4
+	P = 10
+	I = 30
+	D = 1
+	
