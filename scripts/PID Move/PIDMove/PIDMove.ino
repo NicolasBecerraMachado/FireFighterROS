@@ -1,5 +1,3 @@
-
-
 /*
  * This program receives a ROS (Int32) message (between -255 and 255)
  * and commands a DC motor according to the specified value.
@@ -15,11 +13,12 @@
  #include <std_msgs/String.h> 
  #include <avr/io.h>
  #include <avr/interrupt.h>
+ #include <SoftwareSerial.h> 
+ 
 
+/************************* DEFINES OF CODE**************************/
+/*******************************************************************/
 
-/***********
- * Define the material
- **********/
 //Arduino pin definitions
 #define MOT1_IN1 48//IN1 of the L298 should be connected to this arduino pin
 #define MOT1_IN2 46//IN2 of the L298 should be connected to this arduino pin
@@ -51,30 +50,33 @@
 #define CPR 4480
 #define Time5Count 40535
 
-/*
- * Global variables
- */
+#define BT_RX 2
+#define BT_TX 3 
+
+
+/************************* GLOBAL VARIABLES*************************/
+/*******************************************************************/
+
 ros::NodeHandle nh;
 volatile double pwm[4] = {0,0,0,0}; //The motor pwm value between -255->full speed backwards and 255-> Full speed forward
 int enables[4] = {MOT1_EN, MOT2_EN, MOT3_EN, MOT4_EN};
 int in1[4] = {MOT1_IN1, MOT2_IN1, MOT3_IN1, MOT4_IN1};
 int in2[4] = {MOT1_IN2, MOT2_IN2, MOT3_IN2, MOT4_IN2};
 
-
+//Auxiliar Variables
 volatile double w[4] = {0,0,0,0};
 volatile double w_abs[4] = {0,0,0,0};
 volatile int OldCount[4] = { -999,-999,-999,-999 };
 volatile int Count[4];
 volatile int interrupts;
 
+char commandReceived;
+char text[120];
 char pwm1_debug = 'S';
 char pwm2_debug = 'S';
-int compareMatchReg;
-unsigned long t;
-unsigned long oldt;
-boolean interrupt0;
-unsigned int reload = 0xF424; 
 double Speeds[4];
+
+//PID Library Declaration
 
 PID M1(&Speeds[0],&pwm[0],&w_abs[0], 10,30,1,DIRECT);
 PID M2(&Speeds[1],&pwm[1],&w_abs[1], 10,30,1,DIRECT);
@@ -82,12 +84,17 @@ PID M3(&Speeds[2],&pwm[2],&w_abs[2], 10,30,1,DIRECT);
 PID M4(&Speeds[3],&pwm[3],&w_abs[3], 10,30,1,DIRECT);
 
 //PID Controllers[4] = {M1, M2, M3, M4};
-
 Encoder Motor[4] = {{20,26}, {21,28}, {18,22}, {19,24}};
 
-/* 
- * Stop the motor
- */
+//Init Bluetooth
+SoftwareSerial BT(BT_RX, BT_TX);   
+
+
+/************************* CODE LOGIC ******************************/
+/*******************************************************************/
+
+
+/* Stop the motor */
 void motor_stop(int EN, int In1, int In2) {
         //Stop if received an wrong direction
                 digitalWrite(In2, 0);
@@ -154,6 +161,71 @@ void w3_cb(const std_msgs::Float64 &msg) {
     set_w(3,msg.data);
 }
 
+void bluetooth(){
+
+  if (true) {
+    // Read the incoming letter from BT
+    commandReceived = BT.read();
+    
+    switch (commandReceived) { //Move forward 
+      case 'f':
+        for(int i = 0; i < 4; i++){
+          w_abs[i] = 13.33;
+        }     
+        break;
+      case 'b':
+        for(int i = 0; i < 4; i++){  //Move backward 
+          w_abs[i] = 13.33;
+          w[i] = -1;
+        }   
+        
+        break;
+      case 'l':
+        for(int i = 0; i < 4; i++){ //Z angular movement positive
+          w_abs[i] = 3.7333;
+        }   
+          w[0] = -1;
+          w[2] = -1;
+        
+        break;
+      case 'r':
+        for(int i = 0; i < 4; i++){ //Z angular movement negative
+          w_abs[i] = 3.7333;
+        }   
+          w[1] = -1;
+          w[3] = -1;
+        
+        break;
+      case 'c':
+        for(int i = 0; i < 4; i++){ //Y angular movement positive
+          w_abs[i] = 13.33;
+        }   
+          w[0] = -1;
+          w[3] = -1;
+        
+        break;
+      case 'v':
+        for(int i = 0; i < 4; i++){ //Y angular movement negative
+          w_abs[i] = 13.33;
+        }   
+          w[1] = -1;
+          w[2] = -1;
+        
+        break;
+      case 's': //Stop
+        for(int i = 0; i < 4; i++){
+          w_abs[i] = 0;
+        }     
+        break;
+      default: //Stop
+        for(int i = 0; i < 4; i++){
+          w_abs[i] = 0;
+        }        
+        break;
+    }
+  }
+}
+
 
 //Creates the ROS subscribers
 ros::Subscriber<std_msgs::Float64> w0_sub("arduino/w0", w0_cb);
@@ -170,9 +242,11 @@ std_msgs::String strmsg;
 ros::Publisher speeds("RPM", &strmsg);
 char texto[128];
 int motorval[2];
-/*
- * Arduino SETUP
- */
+
+
+/************************* ARDUINO SETUP****************************/
+/*******************************************************************/
+
 void setup() {
   
         //init ROS communication
@@ -186,11 +260,15 @@ void setup() {
         nh.subscribe(w1_sub);
         nh.subscribe(w2_sub);
         nh.subscribe(w3_sub);
-        
+
+        //Init PID Modes
         M1.SetMode(AUTOMATIC);
         M2.SetMode(AUTOMATIC);
         M3.SetMode(AUTOMATIC);
         M4.SetMode(AUTOMATIC);
+
+        //Setup Serial Bps BT
+        BT.begin(38400);
         
         // Arduino pins definition
         pinMode(LED, OUTPUT);
@@ -207,33 +285,21 @@ void setup() {
         pinMode(MOT4_IN2, OUTPUT);
         pinMode(MOT4_EN, OUTPUT);
 
+
+        //Set Timer Logic
         noInterrupts(); //Disable all interrupts
         // Set Timer/Counter Control Register A to 0
         TCCR5A = 0;
         TCCR5B = 0;
-
-        //compareMatchReg = (16000 / (1024 *5)) - 1;
         
         TCNT5H = Time5Count/256;
         TCNT5L = Time5Count%256;
         
-        // Set prescaler to 1024
+        // Set prescaler to 64
         TCCR5B |= (0 << CS52) | (1 << CS51) | (1 << CS50);
         
         TIMSK5 |= (1 << TOIE5); // enable timer oveflow interrupt
         interrupts();
-        /*
-        // Calculate and set timer period
-        //float desired_delay = 1; // 1 second delay
-        //int timer_period = (int)((1.0 / (16000000.0 / 1024.0)) * desired_delay);
-        TCNT1 = 12499  ;
-        OCR1A = reload;
-        
-        // Enable timer interrupt
-        TIMSK1 |= (1 << OCIE1A);
-        
-        // Enable interrupts
-        sei();*/
 
 }
 
@@ -256,6 +322,8 @@ double CalcVel(Encoder enc, int motorID){
   
 }
 
+/*********************TIMER INTERRUPT 10HZ**************************/
+/*******************************************************************/
 
 ISR(TIMER5_OVF_vect) {
   // Code to execute when the timer interrupt occurs
@@ -278,18 +346,22 @@ ISR(TIMER5_OVF_vect) {
   interrupts++;   
   
 }
-/*
- * Arduino MAIN LOOP
- */
 
-char text[120];
+
+/************************* ARDUINO LOOP*****************************/
+/*******************************************************************/
+
 void loop() {
+
+        //ROS required functions
         nh.spinOnce();
         std_msgs::Float64 aux;
         aux.data = Speeds[1];
-        //motorval[0] = analogRead(A1);
-        //motorval[1] = analogRead(A0);
+       
+        //Bluetooth Arduino Logic
+        bluetooth();
         
+        //Debug info to ROS
         chatter.publish(&aux);
         aux.data = pwm[1];
         info.publish(&aux);
