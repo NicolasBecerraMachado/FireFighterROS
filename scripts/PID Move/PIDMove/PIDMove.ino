@@ -50,8 +50,8 @@
 #define CPR 4480
 #define Time5Count 40535
 
-#define BT_RX 2
-#define BT_TX 3 
+//#define BT_RX 
+//#define BT_TX 3 
 
 
 /************************* GLOBAL VARIABLES*************************/
@@ -70,11 +70,12 @@ volatile int OldCount[4] = { -999,-999,-999,-999 };
 volatile int Count[4];
 volatile int interrupts;
 
-char commandReceived;
+char commandReceived = '0';
 char text[120];
 char pwm1_debug = 'S';
 char pwm2_debug = 'S';
 double Speeds[4];
+boolean ROS_Flag = false;
 
 //PID Library Declaration
 
@@ -87,7 +88,7 @@ PID M4(&Speeds[3],&pwm[3],&w_abs[3], 10,30,1,DIRECT);
 Encoder Motor[4] = {{20,26}, {21,28}, {18,22}, {19,24}};
 
 //Init Bluetooth
-SoftwareSerial BT(BT_RX, BT_TX);   
+//SoftwareSerial BT(BT_RX, BT_TX);   
 
 
 /************************* CODE LOGIC ******************************/
@@ -146,41 +147,50 @@ void set_w(int motorID, volatile double value){
 }
 
 void w0_cb(const std_msgs::Float64 &msg) {
+  if(ROS_Flag == false){
     set_w(0,msg.data);
+  }
 }
 
 void w1_cb(const std_msgs::Float64 &msg) {
+  if(ROS_Flag == false){
     set_w(1,msg.data);
+  }
 }
 
 void w2_cb(const std_msgs::Float64 &msg) {
+  if(ROS_Flag == false){
     set_w(2,msg.data);
+  }
 }
 
 void w3_cb(const std_msgs::Float64 &msg) {
+  if(ROS_Flag == false){
     set_w(3,msg.data);
+  }
 }
+
 
 void bluetooth(){
 
-  if (true) {
+  if (Serial3.available()) {
     // Read the incoming letter from BT
-    commandReceived = BT.read();
+    commandReceived = Serial3.read(); 
     
     switch (commandReceived) { //Move forward 
-      case 'f':
+      case '1':
         for(int i = 0; i < 4; i++){
           w_abs[i] = 13.33;
         }     
         break;
-      case 'b':
+      case '2':
         for(int i = 0; i < 4; i++){  //Move backward 
           w_abs[i] = 13.33;
           w[i] = -1;
         }   
         
         break;
-      case 'l':
+      case '3':
         for(int i = 0; i < 4; i++){ //Z angular movement positive
           w_abs[i] = 3.7333;
         }   
@@ -188,7 +198,7 @@ void bluetooth(){
           w[2] = -1;
         
         break;
-      case 'r':
+      case '4':
         for(int i = 0; i < 4; i++){ //Z angular movement negative
           w_abs[i] = 3.7333;
         }   
@@ -196,7 +206,7 @@ void bluetooth(){
           w[3] = -1;
         
         break;
-      case 'c':
+      case '5':
         for(int i = 0; i < 4; i++){ //Y angular movement positive
           w_abs[i] = 13.33;
         }   
@@ -204,7 +214,7 @@ void bluetooth(){
           w[3] = -1;
         
         break;
-      case 'v':
+      case '6':
         for(int i = 0; i < 4; i++){ //Y angular movement negative
           w_abs[i] = 13.33;
         }   
@@ -212,15 +222,20 @@ void bluetooth(){
           w[2] = -1;
         
         break;
-      case 's': //Stop
+      case '7': //Stop
         for(int i = 0; i < 4; i++){
           w_abs[i] = 0;
-        }     
+          w[i] = 0;
+        }
         break;
-      default: //Stop
-        for(int i = 0; i < 4; i++){
-          w_abs[i] = 0;
-        }        
+      case '8': //ROS Disable
+          ROS_Flag = true;
+        break;     
+      case '9': //ROS Enable
+          ROS_Flag = false;
+        break;    
+      default:    
+      
         break;
     }
   }
@@ -268,7 +283,8 @@ void setup() {
         M4.SetMode(AUTOMATIC);
 
         //Setup Serial Bps BT
-        BT.begin(38400);
+        Serial3.begin(9600);
+        Serial.begin(9600);
         
         // Arduino pins definition
         pinMode(LED, OUTPUT);
@@ -284,6 +300,8 @@ void setup() {
         pinMode(MOT4_IN1, OUTPUT);
         pinMode(MOT4_IN2, OUTPUT);
         pinMode(MOT4_EN, OUTPUT);
+        //pinMode(BT_RX, INPUT);
+        //pinMode(BT_TX, OUTPUT);
 
 
         //Set Timer Logic
@@ -328,25 +346,24 @@ double CalcVel(Encoder enc, int motorID){
 ISR(TIMER5_OVF_vect) {
   // Code to execute when the timer interrupt occurs
   //double Speeds[4];
-  for(int i = 0; i < 4; i++){
-      Speeds[i] = CalcVel(Motor[i], i);
-  }
+    bluetooth();
+    for(int i = 0; i < 4; i++){
+        Speeds[i] = CalcVel(Motor[i], i);
+    }
+    
+    M1.Compute();
+    M2.Compute();
+    M3.Compute();
+    M4.Compute();
   
-  M1.Compute();
-  M2.Compute();
-  M3.Compute();
-  M4.Compute();
-
-  for(int i = 0; i < 4; i++){
-      pwm_cb(i);
-  }
-  
-  TCNT5H = Time5Count/256;
-  TCNT5L = Time5Count%256;
-  interrupts++;   
-  
+    for(int i = 0; i < 4; i++){
+        pwm_cb(i);
+    }
+    
+    TCNT5H = Time5Count/256;
+    TCNT5L = Time5Count%256;
+    interrupts++;   
 }
-
 
 /************************* ARDUINO LOOP*****************************/
 /*******************************************************************/
@@ -359,8 +376,8 @@ void loop() {
         aux.data = Speeds[1];
        
         //Bluetooth Arduino Logic
-        bluetooth();
         
+               
         //Debug info to ROS
         chatter.publish(&aux);
         aux.data = pwm[1];
