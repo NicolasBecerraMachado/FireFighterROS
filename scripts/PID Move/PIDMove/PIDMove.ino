@@ -223,6 +223,7 @@ void bluetooth(){
         
         break;
       case '7': //Stop
+        ROS_Flag = true;
         for(int i = 0; i < 4; i++){
           w_abs[i] = 0;
           w[i] = 0;
@@ -284,8 +285,7 @@ void setup() {
 
         //Setup Serial Bps BT
         Serial3.begin(9600);
-        Serial.begin(9600);
-        
+
         // Arduino pins definition
         pinMode(LED, OUTPUT);
         pinMode(MOT1_IN1, OUTPUT);
