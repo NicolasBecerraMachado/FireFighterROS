@@ -66,16 +66,22 @@ int in2[4] = {MOT1_IN2, MOT2_IN2, MOT3_IN2, MOT4_IN2};
 //Auxiliar Variables
 volatile double w[4] = {0,0,0,0};
 volatile double w_abs[4] = {0,0,0,0};
+volatile double vel_bluetooth = 0.0;
 volatile int OldCount[4] = { -999,-999,-999,-999 };
 volatile int Count[4];
 volatile int interrupts;
 
+
+int vel_local = 0;
 char commandReceived = '0';
 char text[120];
 char pwm1_debug = 'S';
 char pwm2_debug = 'S';
 double Speeds[4];
 boolean ROS_Flag = false;
+boolean BT_Front;
+boolean BT_Spin;
+
 
 //PID Library Declaration
 
@@ -131,10 +137,16 @@ void motor_backwards(unsigned int vel, int EN, int In1, int In2) {
 
 //Motor callback
 void pwm_cb(int motorID) {
-    if (w[motorID] >= 0) {
-      motor_forward((unsigned int) pwm[motorID], enables[motorID], in1[motorID], in2[motorID]);
-    } else if (w[motorID] < 0) {
-      motor_backwards((unsigned int) pwm[motorID], enables[motorID], in1[motorID], in2[motorID]);
+
+    if (w_abs[motorID] == 0.0){
+        motor_stop(enables[motorID], in1[motorID], in2[motorID]);
+    }
+    else{
+      if (w[motorID] >= 0) {
+        motor_forward((unsigned int) pwm[motorID], enables[motorID], in1[motorID], in2[motorID]);
+      } else if (w[motorID] < 0) {
+        motor_backwards((unsigned int) pwm[motorID], enables[motorID], in1[motorID], in2[motorID]);
+      }
     }
 }
 
@@ -170,6 +182,12 @@ void w3_cb(const std_msgs::Float64 &msg) {
   }
 }
 
+void reset_w(){
+    for(int i = 0; i < 4; i++){ 
+          w[i] = 0;
+        } 
+}
+
 
 void bluetooth(){
 
@@ -177,34 +195,69 @@ void bluetooth(){
     // Read the incoming letter from BT
     commandReceived = Serial3.read(); 
     
+    
     switch (commandReceived) { //Move forward 
       case '1':
+        if(BT_Front == false ){
+           vel_local = 0;  
+        }
+        reset_w();
         for(int i = 0; i < 4; i++){
-          w_abs[i] = 13.33;
-        }     
+          w_abs[i] = 2*vel_local;
+        } 
+          if(vel_local != 7){
+          vel_local=vel_local+1;
+          }
+        BT_Front= true;
+              
         break;
       case '2':
-        for(int i = 0; i < 4; i++){  //Move backward 
-          w_abs[i] = 13.33;
+        if(BT_Front == true ){
+           vel_local = 0;  
+        }
+        reset_w();
+        for(int i = 0; i < 7; i++){  //Move backward 
+          w_abs[i] = 2*vel_local;
           w[i] = -1;
         }   
-        
+
+          if(vel_local != 4){
+          vel_local=vel_local+1;
+          }   
+        BT_Front = false;
         break;
       case '3':
+        if(BT_Spin == false ){
+           vel_local = 0;  
+        }
+        reset_w();
         for(int i = 0; i < 4; i++){ //Z angular movement positive
-          w_abs[i] = 3.7333;
+          w_abs[i] = 3.7333*vel_local;
         }   
           w[0] = -1;
           w[2] = -1;
-        
+          
+          if(vel_local != 7){
+          vel_local=vel_local+1;
+          }  
+          
+        BT_Spin = true;
         break;
       case '4':
+        if(BT_Spin == true ){
+           vel_local = 0;  
+        }
+        reset_w();
         for(int i = 0; i < 4; i++){ //Z angular movement negative
-          w_abs[i] = 3.7333;
+          w_abs[i] = 3.7333*vel_local;
         }   
           w[1] = -1;
           w[3] = -1;
-        
+
+          if(vel_local != 7){
+          vel_local=vel_local+1;
+          }  
+        BT_Spin = false;
         break;
       case '5':
         for(int i = 0; i < 4; i++){ //Y angular movement positive
@@ -224,6 +277,7 @@ void bluetooth(){
         break;
       case '7': //Stop
         ROS_Flag = true;
+        vel_local = 0;
         for(int i = 0; i < 4; i++){
           w_abs[i] = 0;
           w[i] = 0;
