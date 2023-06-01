@@ -10,7 +10,7 @@ import cv2
 import numpy as np
 import imutils
 
-def image_processing(original_image,width,height): 
+def image_processing(original_image, width, height): 
     """Preprocess the image and obtains the blobs positions """
     objectf = 0
     #Grayscale
@@ -127,7 +127,7 @@ while(True):
     
     if(Pics): #The selection images are stored to disk if true, 
         #Change the direction to the folder where you wanna store the images
-        cv2.imwrite("D:/ProyectoRobotica/Imagenes_limpias/no_fire_var9_"+str(i)+".png", image3)
+        cv2.imwrite("../images/image_name_"+str(i)+".png", image3)
         i = i+1
         print("Screenshots Taken: {}".format(i))
         time.sleep(0.3)

@@ -10,7 +10,7 @@ import cv2
 import numpy as np
 import imutils
 import tensorflow as tf
-#from tensorflow.keras.models import load_model
+from tensorflow.keras.models import load_model
 import os
 import rospy
 from std_msgs.msg import UInt8
@@ -234,7 +234,7 @@ if __name__=="__main__":
     pubTilt = rospy.Publisher('arduino/tilt',UInt8,queue_size=10)
     message = UInt8()
 
-    #model = load_model(os.path.join('models','fireDetection.h5'))
+    #model = load_model(os.path.join('../models','fireDetection.h5'))
     cap = cv2.VideoCapture(0)
     currentPan = 135
     currentTilt = 90

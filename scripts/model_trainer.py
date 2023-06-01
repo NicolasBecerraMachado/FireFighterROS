@@ -94,5 +94,5 @@ print(f'Precision:{pre.result().numpy()}, Recall:{re.result().numpy()}, Accuracy
 input("Press Enter to continue...")
 
 #Save model
-model.save(os.path.join('models','fireDetection.h5'))
+model.save(os.path.join('../models','fireDetection.h5'))
 

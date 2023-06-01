@@ -183,7 +183,7 @@ def rankTargets(targets):
 
     return rankedTargets
 
-model = load_model(os.path.join('models','fireDetection.h5'))
+model = load_model(os.path.join('../models','fireDetection.h5'))
 cap = cv2.VideoCapture(0,cv2.CAP_DSHOW)
 
 def fireDetection(original_image, targets, model):
