@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 import rospy 
 from std_msgs.msg import Float64
 from geometry_msgs.msg import Twist
@@ -23,10 +23,10 @@ class ArduinoNode():
         
         self.twist = Twist()
 
-        self.w0_pub = rospy.Publisher('arduino/w0', Float64, queue_size=10)
-        self.w1_pub = rospy.Publisher('arduino/w1', Float64, queue_size=10)
-        self.w2_pub = rospy.Publisher('arduino/w2', Float64, queue_size=10)
-        self.w3_pub = rospy.Publisher('arduino/w3', Float64, queue_size=10)
+        self.w0_pub = rospy.Publisher('arduino/w0', Float64, queue_size=1)
+        self.w1_pub = rospy.Publisher('arduino/w1', Float64, queue_size=1)
+        self.w2_pub = rospy.Publisher('arduino/w2', Float64, queue_size=1)
+        self.w3_pub = rospy.Publisher('arduino/w3', Float64, queue_size=1)
 
         self.speeds = [Float64(),Float64(),Float64(),Float64()]
 

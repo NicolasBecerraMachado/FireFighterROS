@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu May 25 15:19:52 2023
-
-@author: lgalm
-"""
-
 import time
 import cv2
 import numpy as np
@@ -12,6 +5,8 @@ import imutils
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 import os
+#import rospy
+#from std_msgs.msg import UInt8
 
 #CONSTANTS
 src_width=640
@@ -56,8 +51,8 @@ def targetFiltering(contours, redMask):
         cntY = int(Mmts["m01"]/Mmts["m00"]) #Calculates centroid in Y
 
         redCenter = redMask[cntY,cntX] == 255
-        areaInRange = (area > 350 and area < 60000) #Area threshold, adjust to avoid false positives 
-        centerInRange = ((cntX > 0) and (cntX < 480) and (cntY > 0) and (cntY < 640))
+        areaInRange = (area > 350 and area < 600000) #Area threshold, adjust to avoid false positives 
+        centerInRange = ((cntX > 0) and (cntX < src_width) and (cntY > 0) and (cntY < src_height))
 
         if  areaInRange and redCenter and centerInRange: 
             
@@ -65,13 +60,13 @@ def targetFiltering(contours, redMask):
             widthToHeight = w/h
             squareness = area / w*h
 
-            aspectRatioInRange = (widthToHeight > 0.65 and widthToHeight < 1.4)
-            squarenessInRange = squareness > 0.7
+            aspectRatioInRange = (widthToHeight > 0.5 and widthToHeight < 2)
+            squarenessInRange = squareness > 0.5
             
             if aspectRatioInRange and squarenessInRange:
 
                 flameCenter = (cntX,int(cntY-(h/2)))
-                relFlameCenter = (int(flameCenter[0]-(src_width/2)), -(int(flameCenter[1]-(src_height/2))))
+                relFlameCenter = (int(flameCenter[0]-(src_width/2)), (int(flameCenter[1]-(src_height/2))))
 
                 y,h = adjustBoundingBoxHeight(y,h)
                 targets.append(Target(cntX, cntY, (x,y,w,h), area, contour, flameCenter, relFlameCenter))
@@ -183,8 +178,6 @@ def rankTargets(targets):
 
     return rankedTargets
 
-model = load_model(os.path.join('../models','fireDetection.h5'))
-cap = cv2.VideoCapture(0,cv2.CAP_DSHOW)
 
 def fireDetection(original_image, targets, model):
 
@@ -208,34 +201,72 @@ def fireDetection(original_image, targets, model):
     return None
 
 
-##Main Loop
-while(True):
+def aimAtTarget(target, pubPan, pubTilt, message):
+    
+    if target is not None:
+        currentPan = currentPan + (target.relFlameCenter[0] * 0.7)
+        currentTilt = currentTilt + (target.relFlameCenter[1] * 0.7)
 
-    fire = False
-    #Grabs image from screen
+    else:
+        currentPan = currentPan + (135 - currentPan) * 0.7
+        currentTilt = currentTilt + (90 - currentPan) * 0.7
+
+    #message.data = int(currentPan)
+    #pubPan.publish(message)
+    #message.data = int(currentTilt)
+    #pubTilt.publish(message)
+    
+
+
+
+if __name__=="__main__":
+    #rospy.init_node('vision',anonymous=True)
+
+    #define ros publishers
+    #pubPan = rospy.Publisher('arduino/pan',UInt8,queue_size=10)
+    #pubTilt = rospy.Publisher('arduino/tilt',UInt8,queue_size=10)
+    #message = UInt8()
+
+    #model = load_model(os.path.join('../models','fireDetection.h5'))
+    cap = cv2.VideoCapture(0)
     _, original_image = cap.read()
-    original_image = cv2.GaussianBlur(original_image, (3,3), 0)
-    image = original_image.copy()
 
-    #Calls function to obtain bounding boxes
-    targets = image_processing(image)
+    currentPan = 135
+    currentTilt = 90
+    src_width=original_image.shape[1]
+    src_height=original_image.shape[0]
 
-    #selects the highest priority target
-    rankedTargets = rankTargets(targets)
+    ##Main Loop
+    while(True):
 
-    #Gets ROIs and classifies them
-    fireTarget = fireDetection(original_image, rankedTargets, model)
+        fire = False
+        #Grabs image from screen
+        _, original_image = cap.read()
+        original_image = cv2.GaussianBlur(original_image, (3,3), 0)
+        image = original_image.copy()
+	
+        #Calls function to obtain bounding boxes
+        targets = image_processing(image)
 
-    #Marks targets on screen
-    AddBoundingBoxes(image, rankedTargets)
+        #selects the highest priority target
+        rankedTargets = rankTargets(targets)
 
-    #show all images in windows
-    cv2.imshow('image', image)
-            
-    #if q is pressed the program closes
-    key = cv2.waitKey(25)
-    if key == ord('q'):
-        cv2.destroyAllWindows()
-        break
+        #Gets ROIs and classifies them
+        #fireTarget = fireDetection(original_image, rankedTargets, model)
 
-cap.release()
+        #Marks targets on screen
+        AddBoundingBoxes(image, rankedTargets)
+
+        #Points at target
+        #aimAtTarget(targets[0], pubPan, pubTilt, message)
+
+        #show all images in windows
+        cv2.imshow('image', image)
+                
+        #if q is pressed the program closes
+        key = cv2.waitKey(25)
+        if key == ord('q'):
+            cv2.destroyAllWindows()
+            break
+
+    cap.release()

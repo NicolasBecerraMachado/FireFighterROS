@@ -1,23 +1,18 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu May 25 15:19:52 2023
-
-@author: lgalm
-"""
-
+#!/usr/bin/env python3
 import time
 import cv2
 import numpy as np
 import imutils
 import tensorflow as tf
-from tensorflow.keras.models import load_model
+#from tensorflow.keras.models import load_model
 import os
-import rospy
-from std_msgs.msg import UInt8
+import socket
 
 #CONSTANTS
 src_width=640
 src_height=480
+currentPan = 90
+currentTilt = 130
 
 class Target:
   def __init__(self, cntX, cntY, roi, area, contour, flameCenter, relFlameCenter):
@@ -59,7 +54,7 @@ def targetFiltering(contours, redMask):
 
         redCenter = redMask[cntY,cntX] == 255
         areaInRange = (area > 350 and area < 60000) #Area threshold, adjust to avoid false positives 
-        centerInRange = ((cntX > 0) and (cntX < 480) and (cntY > 0) and (cntY < 640))
+        centerInRange = ((cntX > 0) and (cntX < src_width) and (cntY > 0) and (cntY < src_height))
 
         if  areaInRange and redCenter and centerInRange: 
             
@@ -73,7 +68,7 @@ def targetFiltering(contours, redMask):
             if aspectRatioInRange and squarenessInRange:
 
                 flameCenter = (cntX,int(cntY-(h/2)))
-                relFlameCenter = (int(flameCenter[0]-(src_width/2)), (int(flameCenter[1]-(src_height/2))))
+                relFlameCenter = (-int(flameCenter[0]-(src_width/2)), (int(flameCenter[1]-(src_height/2))))
 
                 y,h = adjustBoundingBoxHeight(y,h)
                 targets.append(Target(cntX, cntY, (x,y,w,h), area, contour, flameCenter, relFlameCenter))
@@ -207,40 +202,75 @@ def fireDetection(original_image, targets, model):
 
     return None
 
-
-def aimAtTarget(target, pubPan, pubTilt, message):
+def getAngleDelta(axis, angle):
     
+    angleToScreenRatio = 0
+    if axis == 0:
+        angleToScreenRatio = angle / (src_width/2)
+    else:
+        angleToScreenRatio = angle / (src_height/2)
+    
+    if angleToScreenRatio > 0.6:
+        return 5
+    elif angleToScreenRatio > 0.3:
+        return 3
+    elif angleToScreenRatio > 0.0:
+        return 1
+    elif angleToScreenRatio > -0.3:
+        return -1
+    elif angleToScreenRatio > -0.6:
+        return -3
+    else:
+        return -5
+
+def aimAtTarget(target, clientSocket):
+    global currentPan
+    global currentTilt
+
     if target is not None:
-        currentPan = currentPan + (target.relFlameCenter[0] * 0.7)
-        currentTilt = currentTilt + (target.relFlameCenter[1] * 0.7)
+        currentPan = currentPan + getAngleDelta(0,target.relFlameCenter[0])
+        currentTilt = currentTilt + getAngleDelta(1,target.relFlameCenter[1])
 
     else:
-        currentPan = currentPan + (135 - currentPan) * 0.7
-        currentTilt = currentTilt + (90 - currentPan) * 0.7
-
-    message.data = int(currentPan)
-    pubPan.publish(message)
-    message.data = int(currentTilt)
-    pubTilt.publish(message)
+        currentPan = 135
+        currentTilt = 90
     
+    if currentPan > 180:
+        currentPan = 180
+    elif currentPan < 0:
+        currentPan = 0
 
+    if currentTilt > 180:
+        currentTilt = 180
+    elif currentTilt < 0:
+        currentTilt = 0
+
+    if clientSocket is not None:
+	
+        output = "{},{}".format(abs(int(currentPan)), abs(int(currentTilt)))
+        print(output)
+        clientSocket.send(bytes(output, "utf-8"))
+	
+    
 
 
 if __name__=="__main__":
-    rospy.init_node('vision',anonymous=True)
-
-    #define ros publishers
-    pubPan = rospy.Publisher('arduino/pan',UInt8,queue_size=10)
-    pubTilt = rospy.Publisher('arduino/tilt',UInt8,queue_size=10)
-    message = UInt8()
-
+    
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind((socket.gethostname(),1234))
+    s.listen(4)
+    
     #model = load_model(os.path.join('../models','fireDetection.h5'))
     cap = cv2.VideoCapture(0)
-    currentPan = 135
-    currentTilt = 90
-
+    _, original_image = cap.read()
+    src_width=original_image.shape[1]
+    src_height=original_image.shape[0]
+    clientSocket, _ = s.accept()
+	
     ##Main Loop
     while(True):
+
+        #clientSocket, _ = s.accept()	
 
         fire = False
         #Grabs image from screen
@@ -261,7 +291,8 @@ if __name__=="__main__":
         AddBoundingBoxes(image, rankedTargets)
 
         #Points at target
-        aimAtTarget(targets[0], pubPan, pubTilt, message)
+        if(len(targets) > 0):
+            aimAtTarget(targets[0], clientSocket)
 
         #show all images in windows
         cv2.imshow('image', image)
@@ -271,5 +302,6 @@ if __name__=="__main__":
         if key == ord('q'):
             cv2.destroyAllWindows()
             break
-
+    
+    clientSocket.close()
     cap.release()
