@@ -28,12 +28,12 @@ class PanTiltNode():
                 panAngle = int(angles_list[0])
                 tiltAngle = int(angles_list[1])
 
-	    message.data = panAngle
-	    print(message.data)
-	    pubPan.publish(message)
-	    message.data = tiltAngle
-	    print(message.data)
-	    pubTilt.publish(message)
+        message.data = panAngle
+        print(message.data)
+        pubPan.publish(message)
+        message.data = tiltAngle
+        print(message.data)
+        pubTilt.publish(message)
 
     def decodeMessage(msg):
         pass
