@@ -226,12 +226,7 @@ def getAngleDelta(axis, angle):
     else:
         return -7
 
-def sendFireData(targets, clientSocket):
-    
-    self.fire_homing_enabled = True if message[2] == "1" else False
-    self.fire_in_water_range = True if message[3] == "1" else False
-    self.fire_angle = int(message[4])
-
+def sendFireData(targets, s):
     global currentPan
     global currentTilt
 
@@ -239,28 +234,39 @@ def sendFireData(targets, clientSocket):
         currentPan = currentPan + getAngleDelta(0,targets[0].relFlameCenter[0])
         currentTilt = currentTilt + getAngleDelta(1,targets[0].relFlameCenter[1])
 
+        if currentPan > 180:
+            currentPan = 180
+        elif currentPan < 0:
+            currentPan = 0
+
+        if currentTilt > 180:
+            currentTilt = 180
+        elif currentTilt < 0:
+            currentTilt = 0
+
+        if s is not None:
+            output = "{},{}".format(abs(int(currentPan)), abs(int(currentTilt)))
+
+            fireHomingEnabled = "1"
+            fireInWaterRange = "1" if targets[0].area > 9000 else "0"
+            fireAngle = int(targets[0].relFlameCenter[0] / src_width * 55)
+            output += ",{},{},{}".format(fireHomingEnabled,fireInWaterRange,fireAngle)
+            s.send(bytes(output, "utf-8"))
     else:
         currentPan = 100
         currentTilt = 70
+
+        if s is not None:
+            output = "{},{}".format(abs(int(currentPan)), abs(int(currentTilt)))
+
+            fireHomingEnabled = "0"
+            fireInWaterRange = "0"
+            fireAngle = "inf"
+            output += ",{},{},{}".format(fireHomingEnabled,fireInWaterRange,fireAngle)
+            s.send(bytes(output, "utf-8"))
     
-    if currentPan > 180:
-        currentPan = 180
-    elif currentPan < 0:
-        currentPan = 0
 
-    if currentTilt > 180:
-        currentTilt = 180
-    elif currentTilt < 0:
-        currentTilt = 0
-
-    if clientSocket is not None:
-        output = "{},{}".format(abs(int(currentPan)), abs(int(currentTilt)))
-
-        fireHomingEnabled = "1"
-        fireInWaterRange = "1" if targets[0].area > 1500 else "0"
-        fireAngle = int(targets[0].relFlameCenter[0] / src_width * 27.5)
-        output += ",{},{},{}".format(fireHomingEnabled,fireInWaterRange,fireAngle)
-        clientSocket.send(bytes(output, "utf-8"))
+    
 
 
 if __name__=="__main__":
@@ -308,18 +314,15 @@ if __name__=="__main__":
         AddBoundingBoxes(image, rankedTargets)
 
         #Send message to pan tilt control
-        if len(targets) > 0:
-            sendFireData(targets, s)
-        else:
-            output = ""
-            clientSocket.send(bytes(output, "utf-8"))
+        sendFireData(targets, s)
+
         
         i+=1
 
         #show all images in windows
         cv2.imshow('image', image)
 
-        time.sleep(50/1000)
+        time.sleep(25/1000)
                 
         #if q is pressed the program closes
         key = cv2.waitKey(25)
@@ -328,5 +331,5 @@ if __name__=="__main__":
             break
         
 
-    clientSocket.close()
+    #clientSocket.close()
     cap.release()

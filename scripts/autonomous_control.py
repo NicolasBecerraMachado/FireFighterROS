@@ -4,7 +4,7 @@ import math
 import numpy as np
 from sensor_msgs.msg import LaserScan  
 from geometry_msgs.msg import Twist
-from geometry_msgs.msg import String
+from std_msgs.msg import String
 from std_msgs.msg import Bool
 
 class AutonomousControl(): 
@@ -52,17 +52,21 @@ class AutonomousControl():
             
             if self.autonomous_control_on:
 
-                vel_msg = search_fire(vel_msg)
-                vel_msg = avoid_obstacles(vel_msg)
-                
-                self.cmd_vel_pub.publish(vel_msg)
+                self.vel_msg = self.search_fire(self.vel_msg)
+                print("----")
+                print(self.vel_msg.linear.x)
+                print(self.vel_msg.angular.z)
+                print(abs(self.fire_angle))
+                print(abs(self.fire_in_water_range))
+                self.vel_msg = self.avoid_obstacles(self.vel_msg)
+                self.cmd_vel_pub.publish(self.vel_msg)
 
             elif self.stop_robot:
 
-                vel_msg.linear.x = 0.0 #m/s
-                vel_msg.angular.z = 0.0 #rad/s
+                self.vel_msg.linear.x = 0.0 #m/s
+                self.vel_msg.angular.z = 0.0 #rad/s
                 
-                self.cmd_vel_pub.publish(vel_msg)
+                self.cmd_vel_pub.publish(self.vel_msg)
                 self.stop_robot = False
 
             r.sleep()
@@ -72,8 +76,9 @@ class AutonomousControl():
     ######### Fire homing  ##########
     def search_fire(self, vel_msg):
         if self.fire_homing_enabled:
-            if abs(self.fire_angle) > 10 and self.fire_angle != np.inf: 
+            if abs(self.fire_angle) > 8 and self.fire_angle != np.inf and not self.fire_in_water_range: 
                 vel_msg.angular.z = self.k_FH0 * (self.fire_angle) * np.pi / 180
+                vel_msg.linear.x = 0.0 #m/s
                 return vel_msg
 
             elif self.fire_in_water_range:
@@ -87,15 +92,16 @@ class AutonomousControl():
 
     ######### Obstacle Avoidance  ##########
     def avoid_obstacles(self, vel_msg):
-        if self.closest_range <= robot_radius:
+        if self.closest_range <= self.robot_radius:
             vel_msg.linear.x = 0
             vel_msg.angular.z = 0.0
-        elif self.closest_range <= avoid_obstacle_range and (abs(self.closest_angle) >= 0 and abs(self.closest_angle) <= math.pi/2):
+        elif self.closest_range <= self.avoid_obstacle_range and (abs(self.closest_angle) >= 0 and abs(self.closest_angle) <= math.pi/2):
             theta_A0 = self.closest_angle+np.pi
             vel_msg.angular.z = k_A0 * theta_A0
 
         #print("closest object range: " + str(self.closest_range))
         #print("closest object angle: " + str(self.closest_angle))
+        return vel_msg
 
     ######## LIDAR VALUE FILTERING ########
     def filter_lidar_zeros(ranges):
@@ -114,10 +120,10 @@ class AutonomousControl():
     def fire_detection_cb(self, msg):
         fire_data = msg.data.split(",")
 
-        if len(fire_data) > 0:
+        if len(fire_data) == 3:
             self.fire_homing_enabled = True if fire_data[0] == "1" else False
             self.fire_in_water_range = True if fire_data[1] == "1" else False
-            self.fire_angle = int(fire_data[2]) if fire_data[2] == "inf" else np.inf
+            self.fire_angle = np.inf if fire_data[2] == "inf" else int(fire_data[2])
         else:
             self.fire_homing_enabled = False
             self.fire_in_water_range = False
