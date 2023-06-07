@@ -353,7 +353,7 @@ void setup() {
         nh.initNode();
         //nh.advertise(chatter);
         //nh.advertise(info);
-        nh.advertise(speeds);
+        //nh.advertise(speeds);
         
         //Subscribed ROS topics
         nh.subscribe(w0_sub);
@@ -512,19 +512,19 @@ void loop() {
 
         //ROS required functions
         nh.spinOnce();
-        std_msgs::Float64 aux;
-        aux.data = Speeds[1];
+        //std_msgs::Float64 aux;
+        //aux.data = Speeds[1];
        
         //Bluetooth Arduino Logic
         
                
         //Debug info to ROS
         //chatter.publish(&aux);
-        aux.data = pwm[1];
+        //aux.data = pwm[1];
         //info.publish(&aux);
-        sprintf(text, "M0 = %d M1 = %d M2 = %d M3 = %d", (int)(Speeds[0]*10.0), (int)(Speeds[1]*10.0),(int)(Speeds[2]*10.0),(int)(Speeds[3]*10.0));
-        strmsg.data = text;
-        speeds.publish(&strmsg);
+        //sprintf(text, "M0 = %d M1 = %d M2 = %d M3 = %d", (int)(Speeds[0]*10.0), (int)(Speeds[1]*10.0),(int)(Speeds[2]*10.0),(int)(Speeds[3]*10.0));
+        //strmsg.data = text;
+        //speeds.publish(&strmsg);
         delay(10);
         
   }
