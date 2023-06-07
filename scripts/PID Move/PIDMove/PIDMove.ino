@@ -11,7 +11,8 @@
  #include <PID_v1.h>
  #include <std_msgs/Float64.h>
  #include <std_msgs/String.h> 
- #include <avr/io.h>
+ #include <std_msgs/UInt8.h>
+ #include <avr/io.h>                                
  #include <avr/interrupt.h>
  #include <SoftwareSerial.h> 
  
@@ -20,39 +21,44 @@
 /*******************************************************************/
 
 //Arduino pin definitions
-#define MOT1_IN1 48//IN1 of the L298 should be connected to this arduino pin
-#define MOT1_IN2 46//IN2 of the L298 should be connected to this arduino pin
-#define MOT2_IN1 52//IN3 of the L298 should be connected to this arduino pin
-#define MOT2_IN2 50//IN4 of the L298 should be connected to this arduino pin
-#define MOT4_IN1 44//IN1 of the L298 should be connected to this arduino pin
-#define MOT4_IN2 42//IN2 of the L298 should be connected to this arduino pin
-#define MOT3_IN1 40//IN3 of the L298 should be connected to this arduino pin
-#define MOT3_IN2 38//IN4 of the L298 should be connected to this arduino pin
-#define MOT1_EN 13 //enable
-#define MOT2_EN 12 //enable
-#define MOT4_EN 11
-#define MOT3_EN 10
+#define MOT4_IN1 48//IN1 of the L298 should be connected to this arduino pin
+#define MOT4_IN2 46//IN2 of the L298 should be connected to this arduino pin
+#define MOT3_IN1 52//IN3 of the L298 should be connected to this arduino pin
+#define MOT3_IN2 50//IN4 of the L298 should be connected to this arduino pin
+#define MOT1_IN1 44//IN1 of the L298 should be connected to this arduino pin
+#define MOT1_IN2 42//IN2 of the L298 should be connected to this arduino pin
+#define MOT2_IN1 40//IN3 of the L298 should be connected to this arduino pin
+#define MOT2_IN2 38//IN4 of the L298 should be connected to this arduino pin
+#define MOT4_EN 13 //enable
+#define MOT3_EN 12 //enable
+#define MOT1_EN 11
+#define MOT2_EN 10
 
-#define ENCODER_MOT1a 20
-#define ENCODER_MOT1b 26
+#define ENCODER_MOT4a 20
+#define ENCODER_MOT4b 26
 
-#define ENCODER_MOT2a 21
-#define ENCODER_MOT2b 28 
+#define ENCODER_MOT3a 21
+#define ENCODER_MOT3b 28 
 
-#define ENCODER_MOT3a 18
-#define ENCODER_MOT3b 22
+#define ENCODER_MOT2a 18
+#define ENCODER_MOT2b 22
 
-#define ENCODER_MOT4a 19
-#define ENCODER_MOT4b 24
+#define ENCODER_MOT1a 19
+#define ENCODER_MOT1b 24
 
 #define LED 7 //A led that blinks when receiving
 
 #define CPR 4480
 #define Time5Count 40535
 
+#define PUMP 7
+#define VALVE 30
+
 //#define BT_RX 
 //#define BT_TX 3 
 
+#define PAN_SERVO 32
+#define TILT_SERVO 34
 
 /************************* GLOBAL VARIABLES*************************/
 /*******************************************************************/
@@ -60,8 +66,8 @@
 ros::NodeHandle nh;
 volatile double pwm[4] = {0,0,0,0}; //The motor pwm value between -255->full speed backwards and 255-> Full speed forward
 int enables[4] = {MOT1_EN, MOT2_EN, MOT3_EN, MOT4_EN};
-int in1[4] = {MOT1_IN1, MOT2_IN1, MOT3_IN1, MOT4_IN1};
-int in2[4] = {MOT1_IN2, MOT2_IN2, MOT3_IN2, MOT4_IN2};
+int in1[4] = {MOT1_IN2, MOT2_IN2, MOT3_IN2, MOT4_IN2};
+int in2[4] = {MOT1_IN1, MOT2_IN1, MOT3_IN1, MOT4_IN1};
 
 //Auxiliar Variables
 volatile double w[4] = {0,0,0,0};
@@ -70,6 +76,8 @@ volatile double vel_bluetooth = 0.0;
 volatile int OldCount[4] = { -999,-999,-999,-999 };
 volatile int Count[4];
 volatile int interrupts;
+volatile int pan_val = 0;
+volatile int tilt_val = 0;
 
 
 int vel_local = 0;
@@ -91,11 +99,12 @@ PID M3(&Speeds[2],&pwm[2],&w_abs[2], 10,30,1,DIRECT);
 PID M4(&Speeds[3],&pwm[3],&w_abs[3], 10,30,1,DIRECT);
 
 //PID Controllers[4] = {M1, M2, M3, M4};
-Encoder Motor[4] = {{20,26}, {21,28}, {18,22}, {19,24}};
+Encoder Motor[4] = {{ENCODER_MOT1a,ENCODER_MOT1b}, {ENCODER_MOT2a,ENCODER_MOT2b}, {ENCODER_MOT3a,ENCODER_MOT3b}, {ENCODER_MOT4a,ENCODER_MOT4b}};
 
 //Init Bluetooth
 //SoftwareSerial BT(BT_RX, BT_TX);   
 
+void SetupServo();
 
 /************************* CODE LOGIC ******************************/
 /*******************************************************************/
@@ -180,6 +189,24 @@ void w3_cb(const std_msgs::Float64 &msg) {
   if(ROS_Flag == false){
     set_w(3,msg.data);
   }
+}
+
+void pump_cb(const std_msgs::UInt8 &msg) {
+  if(msg.data > 0) {
+    digitalWrite(VALVE, HIGH);
+    analogWrite(PUMP, (msg.data*255)/100);
+  }else {
+    digitalWrite(VALVE, LOW);
+    analogWrite(PUMP, 0);
+  }
+}
+
+void pan_cb(const std_msgs::UInt8 &msg){
+  pan_val = msg.data;
+}
+
+void tilt_cb(const std_msgs::UInt8 &msg) {
+  tilt_val = msg.data;
 }
 
 void reset_w(){
@@ -302,6 +329,9 @@ ros::Subscriber<std_msgs::Float64> w0_sub("arduino/w0", w0_cb);
 ros::Subscriber<std_msgs::Float64> w1_sub("arduino/w1", w1_cb);
 ros::Subscriber<std_msgs::Float64> w2_sub("arduino/w2", w2_cb);
 ros::Subscriber<std_msgs::Float64> w3_sub("arduino/w3", w3_cb);
+ros::Subscriber<std_msgs::UInt8> pump_sub("arduino/pump", pump_cb);
+ros::Subscriber<std_msgs::UInt8> pan_sub("arduino/pan", pan_cb);
+ros::Subscriber<std_msgs::UInt8> tilt_sub("arduino/tilt", tilt_cb);
 
 std_msgs::Float64 str_msg;
 ros::Publisher chatter("chatter", &str_msg); 
@@ -321,8 +351,8 @@ void setup() {
   
         //init ROS communication
         nh.initNode();
-        nh.advertise(chatter);
-        nh.advertise(info);
+        //nh.advertise(chatter);
+        //nh.advertise(info);
         nh.advertise(speeds);
         
         //Subscribed ROS topics
@@ -330,7 +360,9 @@ void setup() {
         nh.subscribe(w1_sub);
         nh.subscribe(w2_sub);
         nh.subscribe(w3_sub);
-
+        nh.subscribe(pump_sub);
+        nh.subscribe(pan_sub);
+        nh.subscribe(tilt_sub);
         //Init PID Modes
         M1.SetMode(AUTOMATIC);
         M2.SetMode(AUTOMATIC);
@@ -354,6 +386,11 @@ void setup() {
         pinMode(MOT4_IN1, OUTPUT);
         pinMode(MOT4_IN2, OUTPUT);
         pinMode(MOT4_EN, OUTPUT);
+        pinMode(PUMP, OUTPUT);
+        pinMode(VALVE, OUTPUT);
+        pinMode(PAN_SERVO, OUTPUT);
+        pinMode(TILT_SERVO, OUTPUT);
+        
         //pinMode(BT_RX, INPUT);
         //pinMode(BT_TX, OUTPUT);
 
@@ -372,6 +409,7 @@ void setup() {
         
         TIMSK5 |= (1 << TOIE5); // enable timer oveflow interrupt
         interrupts();
+        SetupServo();
 
 }
 
@@ -379,7 +417,7 @@ double CalcVel(Encoder enc, int motorID){
   float delta;
   double vel;
   double RPM;
-  Count[motorID] = enc.read();
+  Count[motorID] = -1*enc.read(); //Inverts the value of the encoder, since it cant be changed when assigning pins.
   if(Count[motorID] != OldCount[motorID]){
     delta = Count[motorID] - OldCount[motorID];
     OldCount[motorID] = Count[motorID];
@@ -419,6 +457,54 @@ ISR(TIMER5_OVF_vect) {
     interrupts++;   
 }
 
+/*********************  SERVO ROUTINES *****************************/
+/*******************************************************************/
+volatile bool servo_flag = false;
+
+
+void SetupServo(){
+  TCCR4A = 0;
+  TCCR4B = 0x0B;
+  TIMSK4 = 0x06;
+  OCR4AH = 4999/256;
+  OCR4AL = 4999%256;
+  OCR4BH = 250/256;
+  OCR4BL = 250%256;
+  
+}
+
+
+int angleCalc(int an){
+  return 250+(int)((250.0/180.0)*an);
+}
+
+ISR(TIMER4_COMPA_vect){ 
+  int angle = 0;
+  if(servo_flag){
+    digitalWrite(PAN_SERVO, HIGH);
+    digitalWrite(TILT_SERVO,LOW);
+    angle = angleCalc(pan_val);
+    OCR4BH = angle/256;
+    OCR4BL = angle%256;
+    servo_flag = false;
+  }
+  else{
+    digitalWrite(PAN_SERVO, LOW);
+    digitalWrite(TILT_SERVO, HIGH);
+    angle = angleCalc(tilt_val);
+    OCR4BH = angle/256;
+    OCR4BL = angle%256;
+    servo_flag = true;
+  }
+
+}
+
+ISR(TIMER4_COMPB_vect){
+    digitalWrite(PAN_SERVO, LOW);
+    digitalWrite(TILT_SERVO,LOW);  
+}
+
+
 /************************* ARDUINO LOOP*****************************/
 /*******************************************************************/
 
@@ -433,12 +519,12 @@ void loop() {
         
                
         //Debug info to ROS
-        chatter.publish(&aux);
+        //chatter.publish(&aux);
         aux.data = pwm[1];
-        info.publish(&aux);
+        //info.publish(&aux);
         sprintf(text, "M0 = %d M1 = %d M2 = %d M3 = %d", (int)(Speeds[0]*10.0), (int)(Speeds[1]*10.0),(int)(Speeds[2]*10.0),(int)(Speeds[3]*10.0));
         strmsg.data = text;
         speeds.publish(&strmsg);
-        delay(200);
+        delay(10);
         
   }
