@@ -262,6 +262,9 @@ if __name__=="__main__":
     s.bind((socket.gethostname(),1234))
     s.listen(4)
     
+    gpus = tf.config.list_physical_devices('GPU')
+    tf.config.experimental.set_memory_growth(gpus[0],True)
+
     model = load_model(os.path.join('../models','fireDetection.h5'))
     cap = cv2.VideoCapture(0)
     _, original_image = cap.read()
