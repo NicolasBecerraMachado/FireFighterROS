@@ -226,7 +226,12 @@ def getAngleDelta(axis, angle):
     else:
         return -7
 
-def aimAtTarget(targets, clientSocket):
+def sendFireData(targets, clientSocket):
+    
+    self.fire_homing_enabled = True if message[2] == "1" else False
+    self.fire_in_water_range = True if message[3] == "1" else False
+    self.fire_angle = int(message[4])
+
     global currentPan
     global currentTilt
 
@@ -250,17 +255,19 @@ def aimAtTarget(targets, clientSocket):
 
     if clientSocket is not None:
         output = "{},{}".format(abs(int(currentPan)), abs(int(currentTilt)))
-        print(output)
+
+        fireHomingEnabled = "1"
+        fireInWaterRange = "1" if targets[0].area > 1500 else "0"
+        fireAngle = int(targets[0].relFlameCenter[0] / src_width * 27.5)
+        output += ",{},{},{}".format(fireHomingEnabled,fireInWaterRange,fireAngle)
         clientSocket.send(bytes(output, "utf-8"))
-	
-    
 
 
 if __name__=="__main__":
     
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind((socket.gethostname(),1234))
-    s.listen(4)
+    #s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    #s.bind((socket.gethostname(),1234))
+    #s.listen(4)
     
     gpus = tf.config.list_physical_devices('GPU')
     tf.config.experimental.set_memory_growth(gpus[0],True)
@@ -271,13 +278,15 @@ if __name__=="__main__":
     src_width=original_image.shape[1]
     src_height=original_image.shape[0]
     print("Image Dimensions: {}x{}".format(src_width,src_height))
-    clientSocket, _ = s.accept()
-	
+
+    #clientSocket, _ = s.accept()
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((socket.gethostname(),1234))
+
+    fireTarget = ""
     ##Main Loop
     while(True):
-
-        #clientSocket, _ = s.accept()	
-
+        i = 0
         fire = False
         #Grabs image from screen
         _, original_image = cap.read()
@@ -290,23 +299,34 @@ if __name__=="__main__":
         #selects the highest priority target
         rankedTargets = rankTargets(targets)
 
-        #Gets ROIs and classifies them
-        fireTarget = fireDetection(original_image, rankedTargets, model)
+        if i >= 5:
+            #Gets ROIs and classifies them
+            fireTarget = fireDetection(original_image, rankedTargets, model)
+            i = 0
 
         #Marks targets on screen
         AddBoundingBoxes(image, rankedTargets)
 
-        #Points at target
-        aimAtTarget(targets, clientSocket)
+        #Send message to pan tilt control
+        if len(targets) > 0:
+            sendFireData(targets, s)
+        else:
+            output = ""
+            clientSocket.send(bytes(output, "utf-8"))
+        
+        i+=1
 
         #show all images in windows
         cv2.imshow('image', image)
+
+        time.sleep(50/1000)
                 
         #if q is pressed the program closes
         key = cv2.waitKey(25)
         if key == ord('q'):
             cv2.destroyAllWindows()
             break
-    
+        
+
     clientSocket.close()
     cap.release()

@@ -7,20 +7,19 @@ from geometry_msgs.msg import Twist
 from geometry_msgs.msg import String
 from std_msgs.msg import Bool
 
-# This class implements a simple obstacle avoidance algorithm
 class AutonomousControl(): 
 
     ######### Constructor ##########
     def __init__(self): 
         rospy.on_shutdown(self.cleanup) 
 
-        ####################### SUBSCRIBER ############################
+        ####################### SUBSCRIBERS ############################
         rospy.Subscriber("autonomous_control_on", Bool, self.auto_control_cb)
         rospy.Subscriber("base_scan", LaserScan, self.laser_cb)
         rospy.Subscriber("fire_detection", String, self.fire_detection_cb)
         
 
-        ####################### PUBLISHER ############################ 
+        ####################### PUBLISHERS ############################ 
         self.cmd_vel_pub = rospy.Publisher("cmd_vel", Twist, queue_size=1)
         
         
@@ -73,7 +72,7 @@ class AutonomousControl():
     ######### Fire homing  ##########
     def search_fire(self, vel_msg):
         if self.fire_homing_enabled:
-            if abs(self.fire_angle) > 15: 
+            if abs(self.fire_angle) > 10 and self.fire_angle != np.inf: 
                 vel_msg.angular.z = self.k_FH0 * (self.fire_angle) * np.pi / 180
                 return vel_msg
 
@@ -115,9 +114,14 @@ class AutonomousControl():
     def fire_detection_cb(self, msg):
         fire_data = msg.data.split(",")
 
-        self.fire_homing_enabled = True if fire_data[0] == "1" else False
-        self.fire_in_water_range = True if fire_data[1] == "1" else False
-        self.fire_angle = int(fire_data[2])
+        if len(fire_data) > 0:
+            self.fire_homing_enabled = True if fire_data[0] == "1" else False
+            self.fire_in_water_range = True if fire_data[1] == "1" else False
+            self.fire_angle = int(fire_data[2]) if fire_data[2] == "inf" else np.inf
+        else:
+            self.fire_homing_enabled = False
+            self.fire_in_water_range = False
+            self.fire_angle = np.inf 
 
     def laser_cb(self, msg): 
         ## This function receives a message of type LaserScan and computes the closest object direction and range
