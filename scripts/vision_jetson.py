@@ -4,15 +4,15 @@ import cv2
 import numpy as np
 import imutils
 import tensorflow as tf
-#from tensorflow.keras.models import load_model
+from tensorflow.keras.models import load_model
 import os
 import socket
 
 #CONSTANTS
 src_width=640
 src_height=480
-currentPan = 90
-currentTilt = 130
+currentPan = 100
+currentTilt = 70
 
 class Target:
   def __init__(self, cntX, cntY, roi, area, contour, flameCenter, relFlameCenter):
@@ -68,7 +68,7 @@ def targetFiltering(contours, redMask):
             if aspectRatioInRange and squarenessInRange:
 
                 flameCenter = (cntX,int(cntY-(h/2)))
-                relFlameCenter = (-int(flameCenter[0]-(src_width/2)), (int(flameCenter[1]-(src_height/2))))
+                relFlameCenter = (-int(flameCenter[0]-(src_width/2)), -(int(flameCenter[1]-(src_height/2))))
 
                 y,h = adjustBoundingBoxHeight(y,h)
                 targets.append(Target(cntX, cntY, (x,y,w,h), area, contour, flameCenter, relFlameCenter))
@@ -210,30 +210,33 @@ def getAngleDelta(axis, angle):
     else:
         angleToScreenRatio = angle / (src_height/2)
     
-    if angleToScreenRatio > 0.6:
-        return 5
-    elif angleToScreenRatio > 0.3:
-        return 3
-    elif angleToScreenRatio > 0.0:
+    
+    if angleToScreenRatio > 0.5:
+        return 7
+    elif angleToScreenRatio > 0.2:
+        return 4
+    elif angleToScreenRatio > 0.05:
         return 1
-    elif angleToScreenRatio > -0.3:
+    elif angleToScreenRatio > -0.05:
+        return 0
+    elif angleToScreenRatio > -0.2:
         return -1
-    elif angleToScreenRatio > -0.6:
-        return -3
+    elif angleToScreenRatio > -0.5:
+        return -4
     else:
-        return -5
+        return -7
 
-def aimAtTarget(target, clientSocket):
+def aimAtTarget(targets, clientSocket):
     global currentPan
     global currentTilt
 
-    if target is not None:
-        currentPan = currentPan + getAngleDelta(0,target.relFlameCenter[0])
-        currentTilt = currentTilt + getAngleDelta(1,target.relFlameCenter[1])
+    if len(targets) > 0:
+        currentPan = currentPan + getAngleDelta(0,targets[0].relFlameCenter[0])
+        currentTilt = currentTilt + getAngleDelta(1,targets[0].relFlameCenter[1])
 
     else:
-        currentPan = 135
-        currentTilt = 90
+        currentPan = 100
+        currentTilt = 70
     
     if currentPan > 180:
         currentPan = 180
@@ -246,7 +249,6 @@ def aimAtTarget(target, clientSocket):
         currentTilt = 0
 
     if clientSocket is not None:
-	
         output = "{},{}".format(abs(int(currentPan)), abs(int(currentTilt)))
         print(output)
         clientSocket.send(bytes(output, "utf-8"))
@@ -260,11 +262,12 @@ if __name__=="__main__":
     s.bind((socket.gethostname(),1234))
     s.listen(4)
     
-    #model = load_model(os.path.join('../models','fireDetection.h5'))
+    model = load_model(os.path.join('../models','fireDetection.h5'))
     cap = cv2.VideoCapture(0)
     _, original_image = cap.read()
     src_width=original_image.shape[1]
     src_height=original_image.shape[0]
+    print("Image Dimensions: {}x{}".format(src_width,src_height))
     clientSocket, _ = s.accept()
 	
     ##Main Loop
@@ -285,14 +288,13 @@ if __name__=="__main__":
         rankedTargets = rankTargets(targets)
 
         #Gets ROIs and classifies them
-        #fireTarget = fireDetection(original_image, rankedTargets, model)
+        fireTarget = fireDetection(original_image, rankedTargets, model)
 
         #Marks targets on screen
         AddBoundingBoxes(image, rankedTargets)
 
         #Points at target
-        if(len(targets) > 0):
-            aimAtTarget(targets[0], clientSocket)
+        aimAtTarget(targets, clientSocket)
 
         #show all images in windows
         cv2.imshow('image', image)

@@ -3,11 +3,11 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 from tensorflow.keras.models import load_model
-import cv2
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Dense, Flatten, Dropout
 
-data = tf.keras.utils.image_dataset_from_directory('Imagenes_limpias', batch_size=16, image_size=(256,128))
+#data = tf.keras.utils.image_dataset_from_directory('../images', batch_size=16,image_size=(256,128))
+data = tf.keras.preprocessing.image_dataset_from_directory('../images', batch_size=8,image_size=(256,128))
 data_iterator = data.as_numpy_iterator()
 batch = data_iterator.next()
 fig, ax = plt.subplots(ncols=4, figsize=(20,20))

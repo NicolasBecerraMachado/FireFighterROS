@@ -19,6 +19,7 @@ class PanTiltNode():
         panAngle = 130
         tiltAngle = 90
         while not rospy.is_shutdown():
+
             angles = s.recv(15).decode("utf-8")
             print(angles)
             angles_list = angles.split(",")
@@ -33,6 +34,9 @@ class PanTiltNode():
 	    message.data = tiltAngle
 	    print(message.data)
 	    pubTilt.publish(message)
+
+    def decodeMessage(msg):
+        pass
 
     def cleanup(self): 
         #This function is called just before finishing the node 
