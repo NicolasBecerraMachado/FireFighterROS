@@ -6,7 +6,7 @@ import tty
 import sys
 import termios
 from geometry_msgs.msg import Twist
-from geometry_msgs.msg import String
+from std_msgs.msg import String
 from std_msgs.msg import Bool
 
 class MasterNode(): 
@@ -17,7 +17,7 @@ class MasterNode():
 
         ####################### PUBLISHERS ############################ 
         self.cmd_vel_pub = rospy.Publisher("cmd_vel", Twist, queue_size=1)
-        self.auto_control_pub = rospy.Subscriber("autonomous_control_on", Bool, queue_size=1)
+        self.auto_control_pub = rospy.Publisher("autonomous_control_on", Bool, queue_size=1)
         
         
         ######################## CONSTANTS AND VARIABLES ############################## 
@@ -33,36 +33,36 @@ class MasterNode():
         print("Node initialized 10hz")
 
         ##Put terminal in raw mode (No enter required)
-        orig_settings = termios.tcgetattr(sys.stdin)
+        self.orig_settings = termios.tcgetattr(sys.stdin)
         tty.setcbreak(sys.stdin)
 
         ############################### MAIN LOOP #####################################
         while not rospy.is_shutdown():
 
             key = sys.stdin.read(1)[0]
-            process_input(key.lower())
+            self.process_input(key.lower())
 
             r.sleep()
 
     ############################### METHODS #####################################
     def process_input(self, key):
         if(key == 'w'):
-            publish_vel_msg(0.3, 0.0, 0.0)
+            self.publish_vel_msg(0.3, 0.0, 0.0)
 
         elif(key == 'a'):
-            publish_vel_msg(0.0, 0.3, 0.0)
+            self.publish_vel_msg(0.0, 0.3, 0.0)
 
         elif(key == 's'):
-            publish_vel_msg(-0.3, 0.0, 0.0)
+            self.publish_vel_msg(-0.3, 0.0, 0.0)
 
         elif(key == 'd'):
-            publish_vel_msg(0.0, -0.3, 0.0)
+            self.publish_vel_msg(0.0, -0.3, 0.0)
 
         elif(key == 'q'):
-            publish_vel_msg(0.0, 0.0, 0.4)
+            self.publish_vel_msg(0.0, 0.0, 0.4)
 
         elif(key == 'e'):
-            publish_vel_msg(0.0, 0.0, -0.4)
+            self.publish_vel_msg(0.0, 0.0, -0.4)
 
         elif(key == 'o'):
             self.toggle_and_publish_auto_control_msg()
@@ -80,13 +80,13 @@ class MasterNode():
         self.vel_msg.linear.y = linear_y
         self.vel_msg.angular.z = angular_z
 
-        self.auto_control_pub.publish(self.vel_msg)
+        self.cmd_vel_pub.publish(self.vel_msg)
             
     def toggle_and_publish_auto_control_msg(self):
 
         self.autonomous_control_on = True if not self.autonomous_control_on else False
         self.auto_control_msg.data = self.autonomous_control_on
-        self.auto_control_pub.publish(auto_control_msg)
+        self.auto_control_pub.publish(self.auto_control_msg)
 
     ############################### CLEANUP #####################################    
     def cleanup(self): 
@@ -96,8 +96,8 @@ class MasterNode():
         cleanup_message = Twist()
         self.cmd_vel_pub.publish(cleanup_message)
         cleanup_message = Bool()
-        self.auto_control_pub(cleanup_message)
-        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, orig_settings) 
+        self.auto_control_pub.publish(cleanup_message)
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.orig_settings) 
 
 ############################### MAIN PROGRAM #################################### 
 if __name__ == "__main__": 
