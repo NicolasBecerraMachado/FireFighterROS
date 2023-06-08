@@ -47,7 +47,7 @@ class PanTiltNode():
         ##ROS
         r = rospy.Rate(10)
         print("Node initialized 1hz")
-	print("Waiting for vision_jetson.py")
+        print("Waiting for vision_jetson.py")
         self.clientSocket, _ = s.accept()
         print("Listening to vision_jetson.py")
 
