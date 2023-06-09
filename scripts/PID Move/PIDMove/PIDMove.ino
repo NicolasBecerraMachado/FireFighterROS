@@ -49,7 +49,7 @@
 #define LED 7 //A led that blinks when receiving
 
 #define CPR 4480
-#define Time5Count 40535
+#define Time5Count 63305//40535
 
 #define PUMP 7
 #define VALVE 30
@@ -421,8 +421,10 @@ double CalcVel(Encoder enc, int motorID){
   if(Count[motorID] != OldCount[motorID]){
     delta = Count[motorID] - OldCount[motorID];
     OldCount[motorID] = Count[motorID];
-    vel = 10*(2.0*PI*delta)/CPR;
+    vel = 100*(2.0*PI*delta)/CPR;
     RPM = ((vel)/(2.0*PI))*60;
+  }else{
+    vel = 0;
   }
   if (w[motorID]>=0){
     return vel;
@@ -525,6 +527,6 @@ void loop() {
         //sprintf(text, "M0 = %d M1 = %d M2 = %d M3 = %d", (int)(Speeds[0]*10.0), (int)(Speeds[1]*10.0),(int)(Speeds[2]*10.0),(int)(Speeds[3]*10.0));
         //strmsg.data = text;
         //speeds.publish(&strmsg);
-        delay(10);
+        delay(1);
         
   }
