@@ -1,0 +1,21 @@
+#!/bin/bash
+arrVar=()
+roscore &
+arrVar+=("$!")
+rosrun FireFighterRos mecanum_drive &
+arrVar+=("$!")
+rosrun FireFighterRos pan_tilt_control &
+
+echo ${arrVar[@]}
+
+cleanup() {
+    echo "Trap command\!"
+    for i in "${arrVar[@]}"
+    do
+        echo "$i"
+        kill -2 "$i"
+    done
+}
+read varname
+trap cleanup SIGINT
+exit
