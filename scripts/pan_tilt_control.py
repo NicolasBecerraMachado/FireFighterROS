@@ -55,7 +55,7 @@ class PanTiltNode():
         while not rospy.is_shutdown():
             
             if self.autonomous_control_on:
-                #clientSocket.send(bytes("Ready", "utf-8"))
+                
                 self.decode_vision_message(self.clientSocket.recv(40))
                 self.send_fire_data()
 
@@ -75,8 +75,8 @@ class PanTiltNode():
         message = message.split(",")
 
         if(len(message) > 0):
-            self.pan_angle = int(message[0])
-            self.tilt_angle = int(message[1])
+            self.pan_angle = int(message[0]) if message[0].isnumeric() else 0
+            self.tilt_angle = int(message[1]) if message[1].isnumeric() else 0
             self.fire_homing_enabled = True if message[2] == "1" else False
             self.fire_in_water_range = True if message[3] == "1" else False
             self.fire_angle = int(message[4]) if message[4] != "inf" else np.inf

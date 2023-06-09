@@ -59,16 +59,16 @@ class MasterNode():
             self.publish_vel_msg(0.0, -0.3, 0.0)
 
         elif(key == 'q'):
-            self.publish_vel_msg(0.0, 0.0, 0.4)
+            self.publish_vel_msg(0.0, 0.0, 0.8)
 
         elif(key == 'e'):
-            self.publish_vel_msg(0.0, 0.0, -0.4)
+            self.publish_vel_msg(0.0, 0.0, -0.8)
 
         elif(key == 'o'):
             self.toggle_and_publish_auto_control_msg()
         
-        elif(key == chr(27)):
-            self.quit = True
+        elif(key == chr(32)):
+            self.publish_vel_msg(0.0, 0.0, 0)
 
         else:
             pass
