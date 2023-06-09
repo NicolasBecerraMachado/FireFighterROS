@@ -75,6 +75,21 @@ def targetFiltering(contours, redMask):
                 
     return targets
 
+
+def drawTarget(image, target):
+    #Draws a contour around the object found
+    cv2.drawContours(image,[target.contour],-1,(0,0,255),2)
+
+    #Marks the centroid of the object with a circle
+    #cv2.circle(image,(target.cntX,target.cntY),4,(0,255,0),-1)
+
+    #Places the coorddinates on top of the target
+    cv2.putText(image,"({},{})".format(target.relFlameCenter[0], target.relFlameCenter[1]),(target.roi[0],target.roi[1]-8), \
+                cv2.FONT_HERSHEY_SIMPLEX,0.4,(0,0,255),1)
+
+    #Marks the centroid of the object with a circle
+    cv2.circle(image,(target.flameCenter[0], target.flameCenter[1]),4,(0,0,255),4)
+
     
 
 def image_processing(image): 
@@ -105,6 +120,12 @@ def image_processing(image):
     targets=[]
     
     targets = targetFiltering(contours, redMask)
+
+    for target in targets:
+        drawTarget(image, target)
+
+    #puts small circle in the center of the image
+    cv2.circle(image,(int(src_width/2),int(src_height/2)),3,(0,255,0),-1)
     
     return targets
 
@@ -122,6 +143,21 @@ def imageClassification(img, model):
         fire = True
     
     return fire, fireChance
+
+#Function that turns the original image into RGB and places the bounding box
+def AddBoundingBoxes(image, targets):
+    for target in targets:
+        x = target.roi[0]
+        y = target.roi[1]
+        w = target.roi[2]
+        h = target.roi[3]
+
+        color = (0,255,0)
+        if target.currentTarget:
+            color = (0,0,255)
+        
+        cv2.line(image, (int(src_width/2),int(src_height/2)), (target.flameCenter[0], target.flameCenter[1]), (0,255,0), 2)
+        cv2.rectangle(image, (x,y), (x+w, y + h), color,2)
 
 def rankTargets(targets):
 
@@ -175,7 +211,7 @@ def getAngleDelta(axis, angle):
         angleToScreenRatio = angle / (src_height/2)
     
     
-    if angleToScreenRatio > 0.5:
+    if angleToScreenRatio > 0.6:
         return 7
     elif angleToScreenRatio > 0.2:
         return 4
@@ -185,7 +221,7 @@ def getAngleDelta(axis, angle):
         return 0
     elif angleToScreenRatio > -0.2:
         return -1
-    elif angleToScreenRatio > -0.5:
+    elif angleToScreenRatio > -0.6:
         return -4
     else:
         return -7
@@ -195,8 +231,10 @@ def sendFireData(targets, s):
     global currentTilt
 
     if len(targets) > 0:
-        currentPan = currentPan + getAngleDelta(0,targets[0].relFlameCenter[0])
-        currentTilt = currentTilt + getAngleDelta(1,targets[0].relFlameCenter[1])
+        panDelta = getAngleDelta(0,targets[0].relFlameCenter[0])
+        tiltDelta = getAngleDelta(1,targets[0].relFlameCenter[1])
+        currentPan = currentPan + panDelta
+        currentTilt = currentTilt + tiltDelta
 
         if currentPan > 180:
             currentPan = 180
@@ -214,7 +252,8 @@ def sendFireData(targets, s):
             fireHomingEnabled = "1"
             fireInWaterRange = "1" if targets[0].area > 9000 else "0"
             fireAngle = int(targets[0].relFlameCenter[0] / src_width * 55)
-            output += ",{},{},{}".format(fireHomingEnabled,fireInWaterRange,fireAngle)
+            sprayWater = "1" if panDelta == 0 and tiltDelta == 0 else "0"
+            output += ",{},{},{},{}".format(fireHomingEnabled,fireInWaterRange,fireAngle,sprayWater)
             s.send(bytes(output, "utf-8"))
     else:
         currentPan = 100
@@ -225,8 +264,9 @@ def sendFireData(targets, s):
 
             fireHomingEnabled = "0"
             fireInWaterRange = "0"
-            fireAngle = "inf"
-            output += ",{},{},{}".format(fireHomingEnabled,fireInWaterRange,fireAngle)
+            fireAngle = "500"
+            sprayWater = "0"
+            output += ",{},{},{},{}".format(fireHomingEnabled,fireInWaterRange,fireAngle,sprayWater)
             s.send(bytes(output, "utf-8"))
     
 
@@ -269,18 +309,28 @@ if __name__=="__main__":
         #selects the highest priority target
         rankedTargets = rankTargets(targets)
 
-        if i >= 5:
+        if i >= 4:
             #Gets ROIs and classifies them
             fireTarget = fireDetection(original_image, rankedTargets, model)
             i = 0
 
+        #Marks targets on screen
+        #AddBoundingBoxes(image, rankedTargets)
+
         #Send message to pan tilt control
         sendFireData(targets, s)
-
-        
         i+=1
 
-        time.sleep(25/1000)
+        #show all images in windows
+        #cv2.imshow('image', image)
+
+        time.sleep(50/1000)
+                
+        #if q is pressed the program closes
+        #key = cv2.waitKey(25)
+        #if key == ord('q'):
+        #    cv2.destroyAllWindows()
+        #    break
         
 
     #clientSocket.close()

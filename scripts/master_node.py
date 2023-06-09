@@ -29,8 +29,11 @@ class MasterNode():
         ##ROS
         self.vel_msg = Twist()
         self.auto_control_msg = Bool()
+        self.auto_control_msg.data = False
         r = rospy.Rate(10) #10Hz 
         print("Node initialized 10hz")
+        self.cmd_vel_pub.publish(self.vel_msg)
+        self.auto_control_pub.publish(self.auto_control_msg)
 
         ##Put terminal in raw mode (No enter required)
         self.orig_settings = termios.tcgetattr(sys.stdin)
@@ -83,7 +86,6 @@ class MasterNode():
         self.cmd_vel_pub.publish(self.vel_msg)
             
     def toggle_and_publish_auto_control_msg(self):
-
         self.autonomous_control_on = True if not self.autonomous_control_on else False
         self.auto_control_msg.data = self.autonomous_control_on
         self.auto_control_pub.publish(self.auto_control_msg)

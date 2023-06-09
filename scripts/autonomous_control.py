@@ -17,7 +17,7 @@ class AutonomousControl():
         rospy.Subscriber("autonomous_control_on", Bool, self.auto_control_cb)
         rospy.Subscriber("base_scan", LaserScan, self.laser_cb)
         rospy.Subscriber("fire_detection", String, self.fire_detection_cb)
-        
+        rospy.Subscriber("turn_robot", Bool, self.turn_cb)
 
         ####################### PUBLISHERS ############################ 
         self.cmd_vel_pub = rospy.Publisher("cmd_vel", Twist, queue_size=1)
@@ -27,13 +27,16 @@ class AutonomousControl():
         
         ##Autonomous control
         self.autonomous_control_on = False
-        self.stop_robot = False
 
         ##Fire homing
         self.fire_homing_enabled = False
         self.fire_in_water_range = False
         self.fire_angle = np.inf
         self.k_FH0 = 0.6
+
+        #After Spray Turn
+        self.turn_robot_enabled = False
+        self.turn_robot_counter = 0
 
         ##Obstacle avoidance
         self.avoid_obstacle_range = 1.0
@@ -46,34 +49,44 @@ class AutonomousControl():
         self.vel_msg = Twist()
         r = rospy.Rate(10) #10Hz is the lidar's frequency 
         print("Node initialized 1hz")
-
         ############################### MAIN LOOP #####################################
         while not rospy.is_shutdown():
             
             if self.autonomous_control_on:
 
-                self.vel_msg = self.search_fire(self.vel_msg)
-                print("----")
-                print(self.vel_msg.linear.x)
-                print(self.vel_msg.angular.z)
-                print(abs(self.fire_angle))
-                print(abs(self.fire_in_water_range))
-                self.vel_msg = self.avoid_obstacles(self.vel_msg)
+                if self.turn_robot_enabled:
+                    self.vel_msg = turn_robot()
+                else:
+                    self.vel_msg = self.search_fire(self.vel_msg)
+                    self.vel_msg = self.avoid_obstacles(self.vel_msg)
+
                 self.cmd_vel_pub.publish(self.vel_msg)
-
-            elif self.stop_robot:
-
-                self.vel_msg.linear.x = 0.0 #m/s
-                self.vel_msg.angular.z = 0.0 #rad/s
                 
-                self.cmd_vel_pub.publish(self.vel_msg)
-                self.stop_robot = False
 
             r.sleep()
 
     ############################### METHODS #####################################
 
     ######### Fire homing  ##########
+    def turn_robot(self):
+        self.vel_msg.linear.x = 0.0 #m/s
+        
+        if(self.turn_robot_counter <= 20):
+            self.vel_msg.angular.z = (np.pi / 2) / 20 #turns 90 degrees (PI/2) in 2 seconds (20 cycles at 10Hz)
+            self.turn_robot_counter += 1
+
+        else:
+            self.vel_msg.angular.z = 0.0
+            self.turn_robot_enabled = False
+            self.turn_robot_counter = 0
+        
+    def stop_robot(self):
+        self.vel_msg.linear.x = 0.0 #m/s
+        self.vel_msg.angular.z = 0.0 #rad/s
+        
+        self.cmd_vel_pub.publish(self.vel_msg)
+        print("Robot Stopped")
+
     def search_fire(self, vel_msg):
         if self.fire_homing_enabled:
             if abs(self.fire_angle) > 8 and self.fire_angle != np.inf and not self.fire_in_water_range: 
@@ -113,9 +126,10 @@ class AutonomousControl():
     ############################### CALLBACKS #####################################
     def auto_control_cb(self, msg):
         if self.autonomous_control_on and not msg.data:
-            self.stop_robot = True
+            self.stop_robot()
 
         self.autonomous_control_on = msg.data
+        print("Autonomous Control: {}".format("ON" if self.autonomous_control_on else "OFF"))
 
     def fire_detection_cb(self, msg):
         fire_data = msg.data.split(",")
@@ -128,6 +142,9 @@ class AutonomousControl():
             self.fire_homing_enabled = False
             self.fire_in_water_range = False
             self.fire_angle = np.inf 
+
+    def turn_cb(self, msg):
+        self.turn_after_spray_enabled = msg.data
 
     def laser_cb(self, msg): 
         ## This function receives a message of type LaserScan and computes the closest object direction and range
