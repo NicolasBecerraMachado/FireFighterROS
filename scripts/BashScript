@@ -2,9 +2,18 @@
 arrVar=()
 roscore &
 arrVar+=("$!")
+roslaunch ydlidar_ros_driver X4.launch
+arrVar+=("$!")
+chmod 666 /dev/ttyACM0
 rosrun FireFighterRos mecanum_drive &
 arrVar+=("$!")
+rosrun rosserial_python serial_node.py /dev/ttyACM0 _baud:=1000000 &
+arrVar+=("$!")
 rosrun FireFighterRos pan_tilt_control &
+arrVar+=("$!")
+rosrun FireFighterRos master_node &
+arrVar+=("$!")
+rosrun FireFighterRos vision_jetson &
 
 echo ${arrVar[@]}
 
