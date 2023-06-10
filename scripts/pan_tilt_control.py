@@ -19,7 +19,7 @@ class PanTiltNode():
         self.pub_tilt = rospy.Publisher('arduino/tilt', UInt8, queue_size=10)
         self.pub_fire = rospy.Publisher("fire_detection", String, queue_size=10)
         self.pub_pump = rospy.Publisher("arduino/pump", UInt8, queue_size=10)
-        self.pub_turn = rospy.Publisher("turn_robot", Bool(), queue_size=10)
+        self.pub_turn = rospy.Publisher("turn_robot", Bool, queue_size=10)
         
         ######################## CONSTANTS AND VARIABLES ##############################
 
@@ -46,7 +46,9 @@ class PanTiltNode():
 
         ## WATER SPRAY CONTROL
         self.water_spray_enabled = False
-        self.spray_step = 0.25
+        self.spray_base_pan = self.pan_angle
+        self.spray_base_tilt = self.tilt_angle
+        self.spray_step = 0.5
         self.spray_step_counter = 0
         self.spray_direction = 1
         self.spray_cycle_counter = 0
@@ -74,83 +76,95 @@ class PanTiltNode():
             vision_message = self.clientSocket.recv(40)
             if self.autonomous_control_on:
                 
-                if self.water_spray_enabled:
-                    self.spray_water()
+                #if self.water_spray_enabled:
+                #    self.spray_water()
 
-                elif self.wait_after_spray_enabled:
-                    self.wait_after_spray(vision_message)
+                #elif self.wait_after_spray_enabled:
+                #    self.wait_after_spray(vision_message)
 
-                elif self.turn_robot_enabled:
-                    self.turn_robot()
+                #elif self.turn_robot_enabled:
+                #    self.turn_robot()
 
-                else:
-                    self.search_fire(vision_message)
-        
-        r.sleep()
+                #else:
+                self.search_fire(vision_message)
+            print(vision_message)
+            r.sleep()
 
     ############################### METHODS #####################################
     def turn_robot(self):
+	print("turn_robot")
         self.turn_robot_enabled = False
         self.turn_msg.data = True
         self.pub_turn.publish(self.turn_msg)
         self.turn_msg.data = False
 
     def wait_after_spray(self, vision_message):
-
+	print("wait_after_spray")
         if self.after_spray_wait_counter >= 30:
             self.wait_after_spray_enabled = False
             self.after_spray_wait_counter = 0
             self.decode_vision_message(vision_message)
 
             if self.fire_detected:
-                self.water_spray_enabled = True
+                self.water_spray_enabled = False #Change this later
             
             else:
                 self.turn_robot_enabled = True
+                self.water_spray_enabled = False
 
         else:
             self.after_spray_wait_counter += 1
 
 
-    def search_fire(self, fire_data):
-        self.decode_vision_message(vision_message)
+    def search_fire(self, vision_message):
+	print("search_fire")        
+	self.decode_vision_message(vision_message)
         self.send_fire_data()
 
         if self.fire_in_water_range:
             self.aim_pan_tilt()
+        elif not self.fire_detected:
+            self.reset_servos()
+
 
     def spray_water(self):
-        
+        print("spray_water")
         self.spray_step_counter = self.spray_step_counter + self.spray_direction
 
-        current_pan = self.pan_angle * self.spray_step * self.spray_step_counter
-        current_tilt = self.pan_angle * self.spray_step * self.spray_step_counter
+        current_pan = self.spray_base_pan + (self.spray_step * self.spray_step_counter)
+        current_tilt = self.spray_base_tilt + (self.spray_step * self.spray_step_counter)
 
-        if self.spray_step_counter >= 10:
+        if self.spray_step_counter >= 5:
             self.spray_direction = -1
             self.spray_cycle_counter += 1
-        elif self.spray_step_counter <= -10:
+        elif self.spray_step_counter <= -5:
             self.spray_direction = 1
             self.spray_cycle_counter += 1
         
-        if self.spray_cycle_counter >= 10:
-            self.pump_msg.data = 0
+        if self.spray_cycle_counter >= 5:
+            self.pump_msg.data = 0	
+	    self.spray_step_counter = 0
+	    self.spray_cycle_counter = 0
             self.water_spray_enabled = False
             self.wait_after_spray_enabled = True
         else:
             self.pump_msg.data = 100
         
-        self.pan_msg.data = int(current_pan)
-        self.tilt_msg.data = int(current_tilt) if current_tilt > 20 else 20
-        self.pub_pan.publish(self.pan_msg)
+        self.pan_msg.data = abs(int(current_pan))
+        self.tilt_msg.data = abs(int(current_tilt)) if current_tilt > 20 else 20
+        #print("Spray tilt: " + str(self.tilt_msg.data))
+        #print("Spray pan: " + str(self.pan_msg.data))        
+	self.pub_pan.publish(self.pan_msg)
         self.pub_tilt.publish(self.tilt_msg)
         self.pub_pump.publish(self.pump_msg)
 
 
     def decode_vision_message(self, message):
         message = message.decode("utf-8")
+        
         message = message.split(",")
-
+        prev_spray_enabled = self.water_spray_enabled	
+        
         if(len(message) > 0):
             self.pan_angle = int(message[0]) if message[0].isnumeric() else 0
             self.tilt_angle = int(message[1]) if message[1].isnumeric() else 0
@@ -158,6 +172,8 @@ class PanTiltNode():
             self.fire_in_water_range = True if message[3] == "1" else False
             self.fire_angle = int(message[4]) if message[4] != "inf" else np.inf
             self.water_spray_enabled = True if message[5] == "1" else False
+            print("tilt: " + str(self.tilt_angle))
+            print("pan: " + str(self.pan_angle))
 
         else:
             self.pan_angle = 100
@@ -166,8 +182,11 @@ class PanTiltNode():
             self.fire_in_water_range = False
             self.fire_angle = np.inf
             self.water_spray_enabled = False
+        
+        if not prev_spray_enabled and self.water_spray_enabled:
+            self.spray_base_tilt = self.tilt_angle
+            self.spray_base_pan = self.pan_angle
 
-    
     def aim_pan_tilt(self):
         self.pan_msg.data = self.pan_angle
         self.tilt_msg.data = self.tilt_angle if self.tilt_angle > 20 else 20

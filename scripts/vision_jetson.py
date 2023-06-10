@@ -63,7 +63,7 @@ def targetFiltering(contours, redMask):
             squareness = area / w*h
 
             aspectRatioInRange = (widthToHeight > 0.65 and widthToHeight < 1.4)
-            squarenessInRange = squareness > 0.7
+            squarenessInRange = squareness > 0.9
             
             if aspectRatioInRange and squarenessInRange:
 
@@ -212,19 +212,19 @@ def getAngleDelta(axis, angle):
     
     
     if angleToScreenRatio > 0.6:
-        return 7
-    elif angleToScreenRatio > 0.2:
+        return 6
+    elif angleToScreenRatio > 0.25:
         return 4
     elif angleToScreenRatio > 0.05:
         return 1
     elif angleToScreenRatio > -0.05:
         return 0
-    elif angleToScreenRatio > -0.2:
+    elif angleToScreenRatio > -0.25:
         return -1
     elif angleToScreenRatio > -0.6:
         return -4
     else:
-        return -7
+        return -6
 
 def sendFireData(targets, s):
     global currentPan
@@ -241,13 +241,13 @@ def sendFireData(targets, s):
         elif currentPan < 0:
             currentPan = 0
 
-        if currentTilt > 180:
-            currentTilt = 180
-        elif currentTilt < 0:
-            currentTilt = 0
+        if currentTilt > 70:
+            currentTilt = 70
+        elif currentTilt < 20:
+            currentTilt = 20
 
         if s is not None:
-            output = "{},{}".format(abs(int(currentPan)), abs(int(currentTilt)))
+            output = "{},{}".format(int(currentPan), int(currentTilt))
 
             fireDetected = "1"
             fireInWaterRange = "1" if targets[0].area > 9000 else "0"
@@ -309,10 +309,10 @@ if __name__=="__main__":
         #selects the highest priority target
         rankedTargets = rankTargets(targets)
 
-        if i >= 4:
+        #if i >= 4:
             #Gets ROIs and classifies them
-            fireTarget = fireDetection(original_image, rankedTargets, model)
-            i = 0
+            #fireTarget = fireDetection(original_image, rankedTargets, model)
+            #i = 0
 
         #Marks targets on screen
         AddBoundingBoxes(image, rankedTargets)
