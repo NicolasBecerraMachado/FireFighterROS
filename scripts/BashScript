@@ -2,18 +2,20 @@
 arrVar=()
 roscore &
 arrVar+=("$!")
-roslaunch ydlidar_ros_driver X4.launch
+roslaunch ydlidar_ros_driver X4.launch &
+arrVar+=("$!")
+rostopic pub /autonomous_control_on std_msgs/Bool "data: true" &
+arrVar+=("$!")
+rosrun FireFighterRos autonomous_control.py &
 arrVar+=("$!")
 chmod 666 /dev/ttyACM0
-rosrun FireFighterRos mecanum_drive &
+rosrun FireFighterRos mecanum_drive.py &
 arrVar+=("$!")
 rosrun rosserial_python serial_node.py /dev/ttyACM0 _baud:=1000000 &
 arrVar+=("$!")
-rosrun FireFighterRos pan_tilt_control &
+rosrun FireFighterRos pan_tilt_control.py &
 arrVar+=("$!")
-rosrun FireFighterRos master_node &
-arrVar+=("$!")
-rosrun FireFighterRos vision_jetson &
+rosrun FireFighterRos vision_jetson.py &
 
 echo ${arrVar[@]}
 

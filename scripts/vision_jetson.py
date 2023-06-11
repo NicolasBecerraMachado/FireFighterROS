@@ -236,10 +236,10 @@ def sendFireData(targets, s):
         currentPan = currentPan + panDelta
         currentTilt = currentTilt + tiltDelta
 
-        if currentPan > 180:
-            currentPan = 180
-        elif currentPan < 0:
-            currentPan = 0
+        if currentPan > 165:
+            currentPan = 165
+        elif currentPan < 15:
+            currentPan = 15
 
         if currentTilt > 70:
             currentTilt = 70

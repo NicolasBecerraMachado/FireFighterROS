@@ -39,9 +39,9 @@ class AutonomousControl():
         self.turn_robot_counter = 0
 
         ##Obstacle avoidance
-        self.avoid_obstacle_range = 1.0
+        self.avoid_obstacle_range = 0.9
         self.robot_radius = 0.3
-        self.k_A0 = 0.8
+        self.k_A0 = 0.6
         self.closest_angle = 0.0 #Angle to the closest object
         self.closest_range = np.inf #Distance to the closest object
 
@@ -55,10 +55,11 @@ class AutonomousControl():
             if self.autonomous_control_on:
 
                 if self.turn_robot_enabled:
-                    self.vel_msg = turn_robot()
+                    self.vel_msg = self.turn_robot()
                 else:
                     self.vel_msg = self.search_fire(self.vel_msg)
-                    self.vel_msg = self.avoid_obstacles(self.vel_msg)
+                
+                self.vel_msg = self.avoid_obstacles(self.vel_msg)
 
                 self.cmd_vel_pub.publish(self.vel_msg)
                 
@@ -69,16 +70,19 @@ class AutonomousControl():
 
     ######### Fire homing  ##########
     def turn_robot(self):
+        print("Turning Robot")
         self.vel_msg.linear.x = 0.0 #m/s
         
-        if(self.turn_robot_counter <= 20):
-            self.vel_msg.angular.z = (np.pi / 2) / 20 #turns 90 degrees (PI/2) in 2 seconds (20 cycles at 10Hz)
+        if(self.turn_robot_counter < 30):
+            self.vel_msg.angular.z = 0.5 #turns 90 degrees (PI/2) in 0.8 seconds (20 cycles at 10Hz)
             self.turn_robot_counter += 1
 
         else:
             self.vel_msg.angular.z = 0.0
             self.turn_robot_enabled = False
             self.turn_robot_counter = 0
+
+        return self.vel_msg
         
     def stop_robot(self):
         self.vel_msg.linear.x = 0.0 #m/s
@@ -88,6 +92,7 @@ class AutonomousControl():
         print("Robot Stopped")
 
     def search_fire(self, vel_msg):
+        print("Searching Fire")
         if self.fire_homing_enabled:
             if abs(self.fire_angle) > 8 and self.fire_angle != np.inf and not self.fire_in_water_range: 
                 vel_msg.angular.z = self.k_FH0 * (self.fire_angle) * np.pi / 180
@@ -99,7 +104,7 @@ class AutonomousControl():
                 vel_msg.angular.z = 0.0 #rad/s
                 return vel_msg
              
-        vel_msg.linear.x = 0.3 #m/s
+        vel_msg.linear.x = 0.2 #m/s
         vel_msg.angular.z = 0.0 #rad/s
         return vel_msg
 
@@ -139,7 +144,8 @@ class AutonomousControl():
             self.fire_angle = np.inf 
 
     def turn_cb(self, msg):
-        self.turn_after_spray_enabled = msg.data
+        self.turn_robot_enabled = msg.data
+        print("Turn robot callback" + " True" if self.turn_robot_enabled else "False" )
 
     def laser_cb(self, msg): 
         ## This function receives a message of type LaserScan and computes the closest object direction and range
