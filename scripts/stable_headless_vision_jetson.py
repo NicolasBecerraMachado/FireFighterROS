@@ -211,17 +211,17 @@ def getAngleDelta(axis, angle):
         angleToScreenRatio = angle / (src_height/2)
     
     
-    if angleToScreenRatio > 0.5:
+    if angleToScreenRatio > 0.6:
         return 6
-    elif angleToScreenRatio > 0.2:
+    elif angleToScreenRatio > 0.25:
         return 4
     elif angleToScreenRatio > 0.05:
         return 1
     elif angleToScreenRatio > -0.05:
         return 0
-    elif angleToScreenRatio > -0.2:
+    elif angleToScreenRatio > -0.25:
         return -1
-    elif angleToScreenRatio > -0.5:
+    elif angleToScreenRatio > -0.6:
         return -4
     else:
         return -6
@@ -231,35 +231,29 @@ def sendFireData(targets, s):
     global currentTilt
 
     if len(targets) > 0:
-        currentPan = currentPan + getAngleDelta(0,targets[0].relFlameCenter[0])
-        currentTilt = currentTilt + getAngleDelta(1,targets[0].relFlameCenter[1])
-	
+        panDelta = getAngleDelta(0,targets[0].relFlameCenter[0])
+        tiltDelta = getAngleDelta(1,targets[0].relFlameCenter[1])
+        currentPan = currentPan + panDelta
+        currentTilt = currentTilt + tiltDelta
 
         if currentPan > 180:
             currentPan = 180
         elif currentPan < 0:
             currentPan = 0
 
-        if currentTilt > 180:
-            currentTilt = 180
-        elif currentTilt < 0:
-            currentTilt = 0
-
-        print("-------")
-        print(currentPan)
-        print(currentTilt)
-        print(getAngleDelta(0,targets[0].relFlameCenter[0]))
-        print(getAngleDelta(1,targets[0].relFlameCenter[1]))
-        print(targets[0].relFlameCenter[0])
-        print(targets[0].relFlameCenter[1])
+        if currentTilt > 70:
+            currentTilt = 70
+        elif currentTilt < 20:
+            currentTilt = 20
 
         if s is not None:
             output = "{},{}".format(abs(int(currentPan)), abs(int(currentTilt)))
-            #output = "100,70"
+
             fireHomingEnabled = "1"
             fireInWaterRange = "1" if targets[0].area > 9000 else "0"
             fireAngle = int(targets[0].relFlameCenter[0] / src_width * 55)
-            output += ",{},{},{}".format(fireHomingEnabled,fireInWaterRange,fireAngle)
+            sprayWater = "1" if panDelta == 0 and tiltDelta == 0 else "0"
+            output += ",{},{},{},{}".format(fireHomingEnabled,fireInWaterRange,fireAngle,sprayWater)
             s.send(bytes(output, "utf-8"))
     else:
         currentPan = 100
@@ -268,10 +262,11 @@ def sendFireData(targets, s):
         if s is not None:
             output = "{},{}".format(abs(int(currentPan)), abs(int(currentTilt)))
 
-            fireHomingEnabled = "1"
-            fireInWaterRange = "1"
+            fireHomingEnabled = "0"
+            fireInWaterRange = "0"
             fireAngle = "500"
-            output += ",{},{},{}".format(fireHomingEnabled,fireInWaterRange,fireAngle)
+            sprayWater = "0"
+            output += ",{},{},{},{}".format(fireHomingEnabled,fireInWaterRange,fireAngle,sprayWater)
             s.send(bytes(output, "utf-8"))
     
 
@@ -301,7 +296,7 @@ if __name__=="__main__":
     fireTarget = ""
     ##Main Loop
     while(True):
-        i = 0
+        #i = 0
         fire = False
         #Grabs image from screen
         _, original_image = cap.read()
@@ -314,30 +309,28 @@ if __name__=="__main__":
         #selects the highest priority target
         rankedTargets = rankTargets(targets)
 
-        if i >= 5:
+        #if i >= 4:
             #Gets ROIs and classifies them
-            fireTarget = fireDetection(original_image, rankedTargets, model)
-            i = 0
+            #fireTarget = fireDetection(original_image, rankedTargets, model)
+            #i = 0
 
         #Marks targets on screen
-        AddBoundingBoxes(image, rankedTargets)
+        #AddBoundingBoxes(image, rankedTargets)
 
         #Send message to pan tilt control
         sendFireData(targets, s)
-
-        
-        i+=1
+        #i+=1
 
         #show all images in windows
-        cv2.imshow('image', image)
+        #cv2.imshow('image', image)
 
         time.sleep(50/1000)
                 
         #if q is pressed the program closes
-        key = cv2.waitKey(25)
-        if key == ord('q'):
-            cv2.destroyAllWindows()
-            break
+        #key = cv2.waitKey(25)
+        #if key == ord('q'):
+        #    cv2.destroyAllWindows()
+        #    break
         
 
     #clientSocket.close()
