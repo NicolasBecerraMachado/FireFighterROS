@@ -440,7 +440,6 @@ double CalcVel(Encoder enc, int motorID){
 ISR(TIMER5_OVF_vect) {
   // Code to execute when the timer interrupt occurs
   //double Speeds[4];
-    bluetooth();
     for(int i = 0; i < 4; i++){
         Speeds[i] = CalcVel(Motor[i], i);
     }
@@ -518,7 +517,8 @@ void loop() {
         //aux.data = Speeds[1];
        
         //Bluetooth Arduino Logic
-        
+        bluetooth();
+
                
         //Debug info to ROS
         //chatter.publish(&aux);
